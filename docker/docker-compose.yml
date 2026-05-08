@@ -1,0 +1,17 @@
+name: TranspectUITest
+services:
+  transpectui:
+    image: transpectui:latest
+    container_name: TranspectUI
+    volumes:
+      - ../src/transpectui:/opt/basex/webapp/transpectui
+      - ../src/static:/opt/basex/webapp/static
+      - ../code:/opt/code
+      - ../data:/opt/data
+      - ../scripts:/opt/scripts
+    ports:
+     - "8083:8000"
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "5m"

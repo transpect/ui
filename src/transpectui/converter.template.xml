@@ -1,0 +1,23 @@
+<converters>
+  <converter name="converter-name" id="converter-id">
+    <makefile location="/opt/code/converter-id/Makefile"/>
+    <webgui-makefile location="/opt/code/converter-id/infrastructure/webgui/Makefile"/>
+    <inputs comment="Add HTML-Inputs to control the converter options">
+      <input type="text" name-de="Hersteller" name-en="Publisher" p-name="hersteller" required=""/>
+      <input type="text" name-de="Werk-ID" name-en="Work Id" p-name="werkid" required=""/>
+      <select name-de="Template" name-en="Template" p-name="template" required="">
+        <option value="option-value-1">Option 1</option>
+        <option value="option-value-2">Option 2</option>
+      </select>
+      <radiogroup name-de="Überschriften" name-en="Headings" p-name="ueberschriften" required="">
+        <input type="radio" value="1" name="heading 1"/>
+        <input type="radio" value="2" name="heading 2"/>
+      </radiogroup>
+    </inputs>
+    <post-convert>
+      <action name="Speichern" target-name="svn_add_or_commit"/>
+      <action name="Redaktionssystem" target-name="push_to_cms"/>
+      <action name="Stagingsystem" target-name="push_to_cms_test"/>
+    </post-convert>
+  </converter>
+</converters>

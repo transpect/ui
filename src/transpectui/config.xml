@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurations>
+  <configuration>
+    <data-dir-base>/opt/data</data-dir-base>
+  </configuration>
+</configurations>
