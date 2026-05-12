@@ -97,6 +97,24 @@ img.header {
 .valid {
   background-color: #eeffee;
 }
+.filename {
+  margin:5px;
+  max-width:49%;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing:border-box;
+  direction: rtl;
+  text-align: left;
+}
+.actions {
+  width: 50%;
+  display: flex;
+  gap: 10px;
+}
+.line {
+  margin-top:5px;
+  margin-bottom:5px;
+}
 
 input:invalid {
   background-color: #ffeeee;
@@ -150,4 +168,8 @@ div.content-log {
   &:last-child {
     border-bottom: none;
   }
+}
+
+.filename a {
+  text-decoration:none;
 }

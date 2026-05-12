@@ -33,6 +33,12 @@ declare variable $i18n:static-replacements :=
       <replacement lang="es">A Los Resultados</replacement>
       <replacement lang="fr">Aux Résultats</replacement>
     </static-replacement>
+    <static-replacement tag="results">
+      <replacement lang="de">Ergebnisse</replacement>
+      <replacement lang="en">Results</replacement>
+      <replacement lang="es">Resultados</replacement>
+      <replacement lang="fr">Résultats</replacement>
+    </static-replacement>
     <static-replacement tag="running">
       <replacement lang="de">Läuft</replacement>
       <replacement lang="en">Running</replacement>

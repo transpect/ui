@@ -184,11 +184,26 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
       $run-info as map(*) := make:get-runs()?$runid,
       $is-running as xs:boolean := xs:boolean($run-info?running),
       $parameters as xs:string* := $run-info?params,
-      $logs as xs:string* := make:get-logs($runid),
+      $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
+      $logs :=
+        if (file:exists($log-dir))
+        then
+          for $file in file:list($log-dir)
+          let $mod-by := file:last-modified($log-dir || '/' || $file)
+          order by $mod-by
+          where file:exists($log-dir || '/' ||$file)
+          return map {'text': file:read-text($log-dir || '/' ||$file),'time': $mod-by}
+        else (),
       $title as xs:string? := $run-info?filename,
       $url := '/converter/' || $converter-id || '/log/' || $runid,
       $refresh := if ($is-running) then 1 else (),
-      $context := map {'converter-id': $converter-id, 'lang': $lang, 'title': $run-info?filename, 'refresh': $refresh, 'url': $url}
+      $context := map {'converter-id': $converter-id, 'lang': $lang, 'title': $run-info?filename, 'refresh': $refresh, 'url': $url},
+      $post-conv-actions := conv:get-post-conv-actions($converter),
+      $out-path := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $result-files :=
+        for $file in file:list($out-path)
+        where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
+        return {'name': $file, 'path': $out-path || $file}
   return
     element html {
       config:get-html-head($context),
@@ -196,8 +211,12 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
         config:get-html-header($context),
         element div {
           element div {
-            attribute class {'make-parameters'},
-            element h3 {$is-running},
+            attribute class {'well'},
+            element h3 {if ($is-running) then i18n:val('running',$lang) else i18n:val('stopped',$lang)}
+          },
+          element details {
+            attribute class {'make-parameters well'},
+            element summary {'Parameters'},
             element ul {
               for $p in $parameters
               return
@@ -206,20 +225,64 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
                 }
             }
           },
-          element div {
-            attribute class {'make-logs'}
+          element details {
+            attribute class {'make-logs well'},
+            if ($is-running) then attribute open {} else (),
+            element summary {i18n:val('logs',$lang)},
+            for $log at $index in $logs
+            return element div {
+              attribute class {'log-entry'},
+              element span {attribute class {'index'}, $index},
+              element span {attribute class {'time'}, hf:format-dateTime($log?time)},
+              element span {$log?text}
+            }
           },
-          element div {
-            attribute class {'make-links'},
-            element a {
-              attribute href {'/' ||$lang || '/converter/' || $converter-id || '/result/' || $runid},
-              i18n:static-replacement("to-results",$lang)
+          element details {
+            attribute class {'well'},
+            attribute open {},
+            element summary {i18n:val('results',$lang)},
+            for $file in $result-files
+            return element div {
+              attribute class {'line d-flex'},
+              element div {
+                attribute class {'filename'},
+                element a {
+                  attribute href {'/run/' ||$runid || '/download/' || $file?name},
+                  attribute download {$file?name},
+                  $file?name}},
+              element div {
+                attribute class {'actions'},
+                for $action in $post-conv-actions
+                where matches($file?name, $action/xs:string(@regex))
+                return
+                  element input{
+                    attribute type {'button'},
+                    attribute value {$action/xs:string(@message)}
+                  }
+              }
             }
           }
-          
         }
       }
     }
+};
+
+
+declare
+  %rest:GET
+  %rest:path("/run/{$runid}/download/{$filename}")
+function make:download($runid, $filename) {
+  let $outpath := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $filepath := $outpath || $filename,
+      $filesize := file:size($filepath),
+      $format := $filename ! tokenize('.')[last()],
+      $data := file:read-binary($filepath)
+  return
+      (web:response-header(
+        map { 'media-type': 'application/' || $format},
+        map { 'Content-Disposition': 'attachement;filename=' || $filename,
+              'Content-Length': $filesize }),
+       $data)
 };
 
 declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary)) as xs:string {
@@ -265,7 +328,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       $store := st:set('params', $runid, $parameters),
       
       $job-id := hf:eval((), "proc:fork('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),
-      $wait := prof:sleep(250),
+      $wait := prof:sleep(1000),
       $pid := normalize-space(file:read-text($filepath|| '.pid')),
       $store := st:set('pid', $runid, $pid),
       $store-logs := st:set('logs', $runid, element run {attribute run {$runid},element logs {}})
