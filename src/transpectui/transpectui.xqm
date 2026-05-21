@@ -67,7 +67,7 @@ function tr:converter-list($lang as xs:string := 'de'){
           return
             element a {
               attribute class {'block'},
-              attribute href {$converter/xs:string(@id)},
+              attribute href {'/' || $lang || '/converter/' || $converter/xs:string(@id)},
               $converter/xs:string(@name)
             }
           
@@ -100,7 +100,7 @@ function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de
       $title := $converter/xs:string(@name),
       $parameters := $converter/inputs/*,
       $url := '/converter/' || $converter-id,
-      $context := map {'converter-id': $converter-id, 'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url}
   return
     element html {
       config:get-html-head($context),

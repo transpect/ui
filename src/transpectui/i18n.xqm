@@ -21,6 +21,12 @@ declare variable $i18n:static-replacements :=
       <replacement lang="es">Entregar</replacement>
       <replacement lang="fr">Télécharger</replacement>
     </static-replacement>
+    <static-replacement tag="called">
+      <replacement lang="de">abgerufen</replacement>
+      <replacement lang="en">retrieved</replacement>
+      <replacement lang="es">consultado</replacement>
+      <replacement lang="fr">consulté</replacement>
+    </static-replacement>
     <static-replacement tag="select-file">
       <replacement lang="de">Datei hier auswählen</replacement>
       <replacement lang="en">Select File</replacement>
@@ -38,6 +44,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="en">Results</replacement>
       <replacement lang="es">Resultados</replacement>
       <replacement lang="fr">Résultats</replacement>
+    </static-replacement>
+    <static-replacement tag="conversions">
+      <replacement lang="de">Konvertierungen</replacement>
+      <replacement lang="en">Conversions</replacement>
     </static-replacement>
     <static-replacement tag="running">
       <replacement lang="de">Läuft</replacement>
@@ -58,6 +68,14 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="logs">
       <replacement lang="de">Logs</replacement>
       <replacement lang="en">Logs</replacement>
+    </static-replacement>
+    <static-replacement tag="running-conversions">
+      <replacement lang="de">Laufende Konvertierungen</replacement>
+      <replacement lang="en">Running Conversions</replacement>
+    </static-replacement>
+    <static-replacement tag="finished-conversions">
+      <replacement lang="de">Beendete Konvertierungen</replacement>
+      <replacement lang="en">Finished Conversions</replacement>
     </static-replacement>
   </static-replacements>;
 

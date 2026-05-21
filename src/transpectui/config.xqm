@@ -30,15 +30,19 @@ declare function config:get-html-head($context) {
 
 declare function config:get-html-header($context as map(xs:string, item()?)) {
   element header {
-    attribute class {"d-flex"},
+    attribute class {'d-flex'},
     element a {
-      attribute href {'/' || $context?lang || '/converter/' || $context?converter-id},
+      attribute href {'/' || $context?lang || $context?url},
       element img {
         attribute class {"header"},
         attribute src {"/static/transpect.png"}
       }
     },
-    element h1 {$context?title},
+    element div {
+      attribute class {'d-flex center'},
+      element h1 {$context?title},
+      if ($context?subtitle) then element span {attribute class {'date'}, '(' || $context?subtitle || ')'}
+    },
     element ul {
       for $language in $i18n:languages//language
       return (

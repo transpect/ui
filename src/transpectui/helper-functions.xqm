@@ -115,6 +115,37 @@ declare function hf:log($message,$type as xs:string := 'TRACK',$toggle as xs:boo
     else ()
 };
 
+declare function hf:ml-log($messages, $position as xs:string := 'start', $type as xs:string := 'TRACK',$toggle as xs:boolean := true()) as empty-sequence(){
+  let $type-length := string-length($type) 
+  return 
+    switch ($position) {
+      case 'start' return
+        (
+          hf:log($messages[1],'└' || $type),
+          for $m at $i in $messages
+          where $i ge 2
+          return 
+            hf:log($messages[$i],'┃')
+        )
+      case 'middle' return
+        (
+          for $m at $i in $messages
+          return 
+            hf:log($messages[$i],'┃')
+        )
+      
+      case 'end' return
+        (
+          for $m at $i in $messages
+          where $i lt count($messages)
+          return 
+            hf:log($messages[$i],'┃'),
+          hf:log($messages[count($messages)],'┌' || $type)
+        )
+      default return hf:log('ERROR: $position is not valid.')
+    }
+};
+
 declare function hf:element-to-document($item, $base-uri as xs:string){
   parse-xml(serialize($item), map {'base-uri':$base-uri})
 };
