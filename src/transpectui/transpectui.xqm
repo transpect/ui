@@ -57,23 +57,27 @@ function tr:converter-list($lang as xs:string := 'de'){
       $url := '/converter',
       $context := map {'title': $title, 'lang': $lang, 'url':$url}
   return
-    element html {
-      config:get-html-head($context),
-      element body {
-        config:get-html-header($context),
-        element div {
-          attribute class {'well'},
-          for $converter in $converters
-          return
-            element a {
-              attribute class {'block'},
-              attribute href {'/' || $lang || '/converter/' || $converter/xs:string(@id)},
-              $converter/xs:string(@name)
-            }
-          
+    if (count($converters) eq 1)
+    then
+      web:redirect('/' || $lang || '/converter/' || $converters[1]/xs:string(@id))
+    else
+      element html {
+        config:get-html-head($context),
+        element body {
+          config:get-html-header($context),
+          element div {
+            attribute class {'well'},
+            for $converter in $converters
+            return
+              element a {
+                attribute class {'block'},
+                attribute href {'/' || $lang || '/converter/' || $converter/xs:string(@id)},
+                $converter/xs:string(@name)
+              }
+            
+          }
         }
       }
-    }
 };
 
 declare

@@ -9,6 +9,10 @@ BaseX based UI for transpect converters. Currently uses BaseX 11.
 * per converter UI definition
 * localization support
 
+### Missing Features
+
+* Post Conversion Actions
+
 ### Running TranspectUI
 
 `/` always refers to the  root of the  git clone

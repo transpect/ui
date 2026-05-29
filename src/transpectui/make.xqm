@@ -184,7 +184,7 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
         else (),
       $title as xs:string? := $run-info?filename,
       $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)),
-      $url := '/converter/' || $converter-id || '/log/' || $runid,
+      $url := '/converter/' || $converter-id,
       $refresh := if ($is-running) then 1 else (),
       $context := map {'lang': $lang, 'title': $run-info?filename, 'refresh': $refresh, 'url': $url, 'subtitle':$subtitle},
       $post-conv-actions := conv:get-post-conv-actions($converter),
