@@ -32,6 +32,8 @@ BaseX based UI for transpect converters. Currently uses BaseX 11.
 - use docker compose: `cd docker; docker compose up`
 - access UI at [http://localhost:8083/en/converter](http://localhost:8083/en/converter)
 
+- when config is done: `make start`
+
 ### Localization
 
 - String Replacements are tracked in `/src/transpectui/i18n.xqm`
