@@ -13,6 +13,9 @@ BaseX based UI for transpect converters. Currently uses BaseX 11.
 
 * Post Conversion Actions
 
+### Necessary Modifications to Conversion Makefiles
+* add line `echo $$PPID > $(IN_FILE).pid` as first command in conversion target
+
 ### Running TranspectUI
 
 `/` always refers to the  root of the  git clone

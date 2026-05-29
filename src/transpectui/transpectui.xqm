@@ -90,9 +90,34 @@ function tr:run-converter($converter-id as xs:string, $file as map(xs:string, xs
   let $params := request:parameter-map(),
       $text-params := map:remove(request:parameter-map(),'upload_file_uploaded_data'),
       $converter as element(converter) := conv:get($converter-id),
-      $runid := make:start-target-run('conversion', $converter, $text-params, $file) 
-  return web:redirect('/' || $lang ||'/converter/' || $converter-id || '/log/' || $runid)
+      $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file) 
+  return if ($run/error)
+         then web:redirect('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error) 
+         else web:redirect('/' || $lang ||'/converter/' || $converter-id || '/log/'   || $run/id)
 };
+
+declare 
+  %rest:GET
+  %rest:path("/{$lang}/converter/{$converter-id}/error/{$error-message}")
+  %output:method("html")
+  %output:html-version('5')
+function tr:error($error-message, $converter-id, $lang) {
+  let $converter := conv:get($converter-id),
+      $title := $converter/xs:string(@name),
+      $url := '/converter/' || $converter-id,
+      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+  return
+    element html {
+        config:get-html-head($context),
+        element body {
+          config:get-html-header($context),
+          element div {
+            attribute class {'error well'},
+            $error-message
+          }
+        }
+      }
+}; 
 
 declare
   %rest:GET

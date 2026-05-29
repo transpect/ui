@@ -150,17 +150,12 @@ function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:s
                 element span {attribute class {'time'}, hf:format-dateTime($log?time)},
                 element span {$log?text}
               }
-            },
-            element div {
-              attribute class {'make-links well'},
-              hf:create-anchor('/' ||$lang || '/converter/' || $converter-id || '/result/' || $runid, i18n:static-replacement("to-results",$lang))
             }
           }
         }
       }
   else web:redirect('../result/' || $runid)
 };
-
 
 declare
   %rest:GET
@@ -292,7 +287,7 @@ function make:post-conversion-action($runid, $filename, $action-name as xs:strin
   return $start
 };
 
-declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary)) as xs:string {
+declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary)) as element(run) {
   let $makefile := make:get-makefile-for-target($converter, $targetname),
       $runid := hf:id(),
       $store := st:set('start', $runid, current-dateTime()),
@@ -335,10 +330,17 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       $store := st:set('params', $runid, $parameters),
       $job-id := hf:eval((), "proc:fork('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),
       $wait := prof:sleep(1000),
-      $pid := normalize-space(file:read-text($filepath|| '.pid')),
-      $store := st:set('pid', $runid, $pid),
-      $store-logs := st:set('logs', $runid, element run {attribute run {$runid},element logs {}})
-  return $runid
+      $has-pid := file:exists($filepath|| '.pid'),
+      $pid := if ($has-pid) then normalize-space(file:read-text($filepath|| '.pid')) else (),
+      $store := if ($has-pid) then st:set('pid', $runid, $pid) else (),
+      $store-logs := if ($has-pid) then st:set('logs', $runid, element run {attribute run {$runid},element logs {}}) else (),
+      $error-message := (
+        if (not($has-pid)) then 'Die Konvertierung wurde nicht korrekt gestartet. (Die PID konnte nicht gefunden werden)'
+      )
+  return element run {
+           element id {$runid},
+           element error {string-join($error-message,' ')} [$error-message]
+         }
 };
 
 declare function make:start-target($target-name as xs:string, $converter as element(converter), $filepath as xs:string, $runid as xs:string, $parameters as xs:string*) as xs:string {
