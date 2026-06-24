@@ -18,7 +18,7 @@ BaseX based UI for transpect converters. Currently uses BaseX 11.
 
 ### Running TranspectUI
 
-`/` always refers to the  root of the  git clone
+`/` always refers to the root of the git clone
 
 #### Create Image for isolated Docker Deployment
 

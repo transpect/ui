@@ -48,3 +48,8 @@ declare function st:get-runs() as xs:string* {
         return $runid
     default return ()
 };
+
+declare function st:get-run($runid as xs:string){
+  for $file in file:list('/opt/data/runs/' || $runid)
+return ($file || ':',file:read-text('/opt/data/runs/' || $runid || '/' || $file))
+};

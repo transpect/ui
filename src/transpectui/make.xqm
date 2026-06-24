@@ -270,7 +270,6 @@ function make:download($runid, $filename) {
        $data)
 };
 
-
 declare
   %rest:GET
   %rest:path("/run/{$runid}/{$filename}/action/{$action-name}")
@@ -328,7 +327,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       ),
       
       $store := st:set('params', $runid, $parameters),
-      $job-id := hf:eval((), "proc:fork('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),
+      $job-id := hf:eval((), "proc:execute('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),
       $wait := prof:sleep(1000),
       $has-pid := file:exists($filepath|| '.pid'),
       $pid := if ($has-pid) then normalize-space(file:read-text($filepath|| '.pid')) else (),
