@@ -164,6 +164,7 @@ declare
   %output:html-version('5')
 function make:result($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
   let $converter as element(converter) := conv:get($converter-id),
+      $job-results := make:store-job-messages($runid),
       $run-info as map(*) := make:get-runs()?$runid,
       $is-running as xs:boolean := xs:boolean($run-info?running),
       $parameters as xs:string* := $run-info?params,
@@ -254,6 +255,19 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
                     attribute value {$action/xs:string(@message)},
                     attribute data-href {string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/')}
                   }
+              }
+            }
+          },
+          element details {
+            attribute class {'well'},
+            element summary {i18n:val('run',$lang)},
+            element div {
+              attribute class {'overflow'},
+              for $m  at $index in $job-results
+              return element div {
+                attribute class {'log-entry'},
+                element span {attribute class {'index'}, $index},
+                element span {$m}
               }
             }
           }
@@ -357,6 +371,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       $job-id := hf:eval((), "proc:execute('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),
       $wait := prof:sleep(1000),
       $has-pid := file:exists($filepath|| '.pid'),
+      $store := st:set('job-id',$runid, $job-id),
       $pid := if ($has-pid) then normalize-space(file:read-text($filepath|| '.pid')) else (),
       $store := if ($has-pid) then st:set('pid', $runid, $pid) else (),
       $store-logs := if ($has-pid) then st:set('logs', $runid, element run {attribute run {$runid},element logs {}}) else (),
@@ -367,6 +382,19 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
            element id {$runid},
            element error {string-join($error-message,' ')} [$error-message]
          }
+};
+
+declare function make:store-job-messages($runid as xs:string){
+  let $job-id := st:get('job-id',$runid),
+      $state := job:list-details($job-id)/xs:string(@state),
+      $messages := 
+        if ($state eq 'cached')
+        then job:result($job-id)/output/text() ! tokenize(.,'\n')
+        else st:get('job-results',$runid),
+      $store := if ($state eq 'cached')
+        then st:set('job-results',$runid, $messages)
+        else ()
+  return $messages
 };
 
 declare function make:start-target($target-name as xs:string, $converter as element(converter), $filepath as xs:string, $runid as xs:string, $parameters as xs:string*) as xs:string {

@@ -77,6 +77,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Laufende Konvertierungen</replacement>
       <replacement lang="en">Running Conversions</replacement>
     </static-replacement>
+    <static-replacement tag="run">
+      <replacement lang="de">Aufruf</replacement>
+      <replacement lang="en">Run</replacement>
+    </static-replacement>
     <static-replacement tag="finished-conversions">
       <replacement lang="de">Beendete Konvertierungen</replacement>
       <replacement lang="en">Finished Conversions</replacement>

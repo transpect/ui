@@ -93,7 +93,7 @@ function tr:run-converter($converter-id as xs:string, $file as map(xs:string, xs
       $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file) 
   return if ($run/error)
          then web:redirect('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error) 
-         else web:redirect('/' || $lang ||'/converter/' || $converter-id || '/log/'   || $run/id)
+         else web:redirect('/' || $lang ||'/converter/' || $converter-id || '/run/'   || $run/id || '/logs')
 };
 
 declare 
