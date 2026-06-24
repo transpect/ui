@@ -386,7 +386,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
 
 declare function make:store-job-messages($runid as xs:string){
   let $job-id := st:get('job-id',$runid),
-      $state := job:list-details($job-id)/xs:string(@state),
+      $state := if ($job-id) then job:list-details($job-id)/xs:string(@state) else 'not-found',
       $messages := 
         if ($state eq 'cached')
         then job:result($job-id)/output/text() ! tokenize(.,'\n')
