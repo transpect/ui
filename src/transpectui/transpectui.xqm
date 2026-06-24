@@ -137,7 +137,7 @@ function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de
         config:get-html-header($context),
         element div {
           attribute class {'well'},
-          hf:create-anchor('/' || $lang || '/converter/' || $converter-id || '/runs','Vorherige Konvertierungen')
+          hf:create-anchor('/' || $lang || '/converter/' || $converter-id || '/runs',i18n:val('prev-conversions',$lang))
         },
         element div {
           attribute class {'well'},

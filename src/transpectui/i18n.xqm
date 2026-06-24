@@ -15,6 +15,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="es">Subir Datos</replacement>
       <replacement lang="fr">Télécharger des données</replacement>
     </static-replacement>
+    <static-replacement tag="prev-conversions">
+      <replacement lang="de">Vorherige Konvertierungen</replacement>
+      <replacement lang="en">Previous Conversions</replacement>
+    </static-replacement>
     <static-replacement tag="submit">
       <replacement lang="de">Hochladen</replacement>
       <replacement lang="en">Submit</replacement>
