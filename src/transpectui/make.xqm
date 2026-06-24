@@ -18,7 +18,7 @@ declare
 function make:all-runs($converter-id as xs:string, $lang as xs:string){
   let $runs := make:get-runs(),
       $title := i18n:static-replacement('conversions',$lang),
-      $url as xs:string := '/converter/' || $converter-id || '/runs',
+      $url as xs:string := '/converter/' || $converter-id,
       $context := map {'title': $title, 'lang': $lang, 'url':$url},
       $running-runs :=
         for $runid in map:keys($runs)
