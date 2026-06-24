@@ -51,5 +51,5 @@ declare function st:get-runs() as xs:string* {
 
 declare function st:get-run($runid as xs:string){
   for $file in file:list('/opt/data/runs/' || $runid)
-return ($file || ':',file:read-text('/opt/data/runs/' || $runid || '/' || $file))
+  return ($file || ':',file:read-text('/opt/data/runs/' || $runid || '/' || $file))
 };

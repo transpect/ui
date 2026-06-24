@@ -226,14 +226,24 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
             attribute open {},
             element summary {i18n:val('results',$lang)},
             for $file in $result-files
+            let $extention := ($file?name => tokenize('[\./]'))[last()],
+                $show-direct as xs:boolean := $extention = ('xhtml','html')
             return element div {
               attribute class {'line d-flex'},
               element div {
                 attribute class {'filename'},
-                element a {
-                  attribute href {'/run/' ||$runid || '/' || $file?name || '/download'},
-                  attribute download {$file?name},
-                  $file?name}},
+                if ($show-direct)
+                then
+                  element a {
+                    attribute href {'/run/' ||$runid || '/show/' || $file?name},
+                    attribute target {'_blank'},
+                    $file?name}
+                else
+                  element a {
+                    attribute href {'/run/' ||$runid || '/download/' || $file?name},
+                    attribute target {'_blank'},
+                    attribute download {$file?name},
+                    $file?name}},
               element div {
                 attribute class {'actions'},
                 for $action in $post-conv-actions
@@ -255,7 +265,7 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
 
 declare
   %rest:GET
-  %rest:path("/run/{$runid}/{$filename}/download")
+  %rest:path("/run/{$runid}/download/{$filename}")
 function make:download($runid, $filename) {
   let $outpath := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $filepath := $outpath || $filename,
@@ -268,6 +278,23 @@ function make:download($runid, $filename) {
         map { 'Content-Disposition': 'attachement;filename=' || $filename,
               'Content-Length': $filesize }),
        $data)
+};
+
+declare
+  %rest:GET
+  %rest:path("/run/{$runid}/show/{$filename}")
+  %output:method("html")
+  %output:html-version('5')
+function make:show($runid, $filename) {
+  let $outpath := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $filepath := $outpath || $filename,
+      $filesize := file:size($filepath),
+      $extention := ($filename => tokenize('[\./]'))[last()],
+      $show-direct as xs:boolean := $extention = ('xhtml','html'),
+      $format := $filename ! tokenize('.')[last()],
+      $data := if ($show-direct) then doc($filepath) else file:read-binary($filepath),
+      $log := admin:write-log($filename || ': ' || $extention || ': ' || xs:string($show-direct))
+  return if ($show-direct) then $data else web:error('415','Das Dokument kann nicht angezeigt werden.')
 };
 
 declare
