@@ -20,7 +20,7 @@ declare function config:get-html-head($context) {
     element link{
       attribute rel {"icon"},
       attribute type {"image/x-icon"},
-      attribute href {"/static/favicon.png"}
+      attribute href {"/static/favicon-96x96.png"}
     },
     element script {
       attribute src {"/static/transpectui.js"}
