@@ -135,9 +135,8 @@ function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de
       config:get-html-head($context),
       element body {
         config:get-html-header($context),
-        element details {
+        element div {
           attribute class {'well'},
-          element summary {'Admin'},
           hf:create-anchor('/' || $lang || '/converter/' || $converter-id || '/runs','Vorherige Konvertierungen')
         },
         element div {

@@ -100,7 +100,7 @@ function make:logs($converter-id as xs:string, $lang as xs:string){
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/log/{$runid}")
+  %rest:path("/{$lang}/converter/{$converter-id}/run/{$runid}/logs")
   %output:method("html")
   %output:html-version('5')
 function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
@@ -154,12 +154,12 @@ function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:s
           }
         }
       }
-  else web:redirect('../result/' || $runid)
+  else web:redirect('../' || $runid || '/result')
 };
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/result/{$runid}")
+  %rest:path("/{$lang}/converter/{$converter-id}/run/{$runid}/result")
   %output:method("html")
   %output:html-version('5')
 function make:result($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
@@ -479,7 +479,7 @@ declare function make:run-info-display($runid as xs:string, $run, $lang as xs:st
       element div {
         attribute class {'run-info running'},
         $running-text,
-        hf:create-anchor('/' ||$lang || '/converter/' || $converter-id || '/log/' || $runid, if ($is-running) then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
+        hf:create-anchor('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/logs', if ($is-running) then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
       },
       element div {
         attribute class {'run-info starttime'},
