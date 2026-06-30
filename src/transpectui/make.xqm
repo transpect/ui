@@ -92,7 +92,7 @@ function make:logs($converter-id as xs:string, $lang as xs:string){
           for $runid in map:keys($runs)
           let $run := $runs?$runid
           return
-            hf:create-anchor($url || $runid, $runid || ' (' ||$run?converter || ')', 'block')
+            hf:create-anchor(config:url($url || $runid), $runid || ' (' ||$run?converter || ')', 'block')
         }
       }
     }
@@ -236,12 +236,12 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
                 if ($show-direct)
                 then
                   element a {
-                    attribute href {'/run/' ||$runid || '/show/' || $file?name},
+                    attribute href {config:url('/run/' ||$runid || '/show/' || $file?name)},
                     attribute target {'_blank'},
                     $file?name}
                 else
                   element a {
-                    attribute href {'/run/' ||$runid || '/download/' || $file?name},
+                    attribute href {config:url('/run/' ||$runid || '/download/' || $file?name)},
                     attribute target {'_blank'},
                     attribute download {$file?name},
                     $file?name}},
@@ -253,7 +253,7 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
                   element input{
                     attribute type {'button'},
                     attribute value {$action/xs:string(@message)},
-                    attribute data-href {string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/')}
+                    attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
                   }
               }
             }
@@ -507,7 +507,7 @@ declare function make:run-info-display($runid as xs:string, $run, $lang as xs:st
       element div {
         attribute class {'run-info running'},
         $running-text,
-        hf:create-anchor('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/logs', if ($is-running) then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
+        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/logs'), if ($is-running) then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
       },
       element div {
         attribute class {'run-info starttime'},
@@ -522,9 +522,6 @@ declare function make:run-info-display($runid as xs:string, $run, $lang as xs:st
         $runid
       }
     }
-    (:element div {
-        '[' || $running-text || ' [',hf:create-anchor('/' ||$lang || '/converter/' || $converter-id || '/log/' || $runid, if ($is-running) then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang)), ']] ' || hf:format-dateTime($start) || ' ' || $filename || ' (' || $runid || ') '
-    }:)
 };
 
 declare function make:get-file-logs($file) {

@@ -71,7 +71,7 @@ function tr:converter-list($lang as xs:string := 'de'){
             return
               element a {
                 attribute class {'block'},
-                attribute href {'/' || $lang || '/converter/' || $converter/xs:string(@id)},
+                attribute href {config:url('/' || $lang || '/converter/' || $converter/xs:string(@id))},
                 $converter/xs:string(@name)
               }
             
@@ -137,7 +137,7 @@ function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de
         config:get-html-header($context),
         element div {
           attribute class {'well'},
-          hf:create-anchor('/' || $lang || '/converter/' || $converter-id || '/runs',i18n:val('prev-conversions',$lang))
+          hf:create-anchor(config:url('/' || $lang || '/converter/' || $converter-id || '/runs'),i18n:val('prev-conversions',$lang))
         },
         element div {
           attribute class {'well'},

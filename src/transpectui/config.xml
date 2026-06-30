@@ -2,5 +2,6 @@
 <configurations>
   <configuration>
     <data-dir-base>/opt/data</data-dir-base>
+    <base-url></base-url>
   </configuration>
 </configurations>
