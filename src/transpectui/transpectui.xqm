@@ -59,7 +59,7 @@ function tr:converter-list($lang as xs:string := 'de'){
   return
     if (count($converters) eq 1)
     then
-      web:redirect('/' || $lang || '/converter/' || $converters[1]/xs:string(@id))
+      web:redirect(config:url('/' || $lang || '/converter/' || $converters[1]/xs:string(@id)))
     else
       element html {
         config:get-html-head($context),
@@ -92,8 +92,8 @@ function tr:run-converter($converter-id as xs:string, $file as map(xs:string, xs
       $converter as element(converter) := conv:get($converter-id),
       $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file) 
   return if ($run/error)
-         then web:redirect('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error) 
-         else web:redirect('/' || $lang ||'/converter/' || $converter-id || '/run/'   || $run/id || '/logs')
+         then web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error)) 
+         else web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/run/'   || $run/id || '/logs'))
 };
 
 declare 
@@ -142,7 +142,7 @@ function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de
         element div {
           attribute class {'well'},
           element form {
-            attribute action {'/' || $lang || '/converter/' || $converter-id || '/convert'},
+            attribute action {config:url('/' || $lang || '/converter/' || $converter-id || '/convert')},
             attribute method {'POST'},
             attribute enctype {"multipart/form-data"},
             for $p in $parameters
