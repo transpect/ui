@@ -5,6 +5,7 @@ import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
 import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
 import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace st = 'http://le-tex.de/store' at 'store.xqm';
+import module namespace queue = 'http://le-tex.de/queue' at 'queue.xqm';
 
 (: 
  : wrapper module for the orchestration of convertion runs.
@@ -22,11 +23,15 @@ function make:all-runs($converter-id as xs:string, $lang as xs:string){
       $context := map {'title': $title, 'lang': $lang, 'url':$url},
       $running-runs :=
         for $runid in map:keys($runs)
-        where xs:boolean($runs?$runid?running)
+        where xs:boolean($runs?$runid?status eq 'running')
         return $runid,
       $finished-runs :=
         for $runid in map:keys($runs)
-        where not(xs:boolean($runs?$runid?running))
+        where not(xs:boolean($runs?$runid?status = ('queued','running')))
+        return $runid,
+      $queued-runs :=
+        for $runid in map:keys($runs)
+        where xs:boolean($runs?$runid?status eq 'queued')
         return $runid
   return
     element html {
@@ -39,6 +44,13 @@ function make:all-runs($converter-id as xs:string, $lang as xs:string){
             attribute class {'date spacious'},
             i18n:static-replacement('called',$lang) || ': ' || hf:format-dateTime(current-dateTime())
           },
+          element div {
+            attribute class {'well'},
+            i18n:static-replacement('queued-conversions',$lang) || ':',
+            for $runid in $queued-runs
+            let $run as map(*) :=$runs?$runid
+            order by $run?start descending
+            return make:run-info-display($runid, $run, $lang, $converter-id)},
           element div {
             attribute class {'well'},
             i18n:static-replacement('running-conversions',$lang) || ':',
@@ -106,14 +118,20 @@ declare
 function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
   let $converter as element(converter) := conv:get($converter-id),
       $run-info as map(*) := make:get-runs()?$runid,
-      $is-running as xs:boolean := xs:boolean($run-info?running),
+      $status as xs:string := $run-info?status,
+      $is-running as xs:boolean := $status eq 'running' or $status eq 'queued',
       $parameters as xs:string* := $run-info?params,
       $logs as xs:string* := make:get-logs($runid),
+      $short-status := switch ($status)
+                        case 'running' return 'R'
+                        case 'queued' return 'Q'
+                        case 'stopped' return 'S'
+                        default return '-',
       $title as xs:string? := $run-info?filename,
       $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)),
-      $url := '/converter/' || $converter-id || '/log/' || $runid,
+      $url := '/converter/' || $converter-id,
       $refresh := if ($is-running) then 5 else (),
-      $context := map {'lang': $lang, 'title': $title, 'refresh': $refresh, 'url': $url, 'subtitle':$subtitle},
+      $context := map {'lang': $lang, 'title': $title, 'status': '(' || $short-status || ') ', 'refresh': $refresh, 'url': $url, 'subtitle':$subtitle},
       $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
       $logs := make:get-file-logs($run-info?file)
   return
@@ -126,7 +144,7 @@ function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:s
           element div {
             element div {
               attribute class {'well'},
-              element h3 {if ($is-running) then i18n:val('running',$lang) else i18n:val('stopped',$lang)}
+              element h3 {i18n:val($status,$lang)}
             },
             element details {
               attribute class {'make-parameters well'},
@@ -141,7 +159,7 @@ function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:s
             },
             element details {
               attribute class {'make-logs well'},
-              if ($is-running) then attribute open {} else (),
+              if ($status eq 'running') then attribute open {} else (),
               element summary {i18n:val('logs',$lang)},
               for $log at $index in $logs
               return element div {
@@ -166,7 +184,8 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
   let $converter as element(converter) := conv:get($converter-id),
       $job-results := make:store-job-messages($runid),
       $run-info as map(*) := make:get-runs()?$runid,
-      $is-running as xs:boolean := xs:boolean($run-info?running),
+      $status as xs:string := $run-info?status,
+      $is-running as xs:boolean := $status eq 'running',
       $parameters as xs:string* := $run-info?params,
       $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
       $logs :=
@@ -197,7 +216,7 @@ function make:result($converter-id as xs:string, $runid as xs:string, $lang as x
         element div {
           element div {
             attribute class {'well'},
-            element h3 {if ($is-running) then i18n:val('running',$lang) else i18n:val('stopped',$lang)}
+            element h3 {i18n:val($status,$lang)}
           },
           element details {
             attribute class {'make-parameters well'},
@@ -368,15 +387,17 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       ),
       
       $store := st:set('params', $runid, $parameters),
-      $job-id := hf:eval((), "proc:execute('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),
+      $queue-job := queue:register("declare variable $parameters external; declare variable $options external; proc:execute('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}, $ns:store || "declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id)"),
+      (:$job-id := hf:eval((), "proc:execute('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target')}),:)
       $wait := prof:sleep(1000),
+      $store := st:set('queue-id',$runid,$queue-job?id),
       $has-pid := file:exists($filepath|| '.pid'),
-      $store := st:set('job-id',$runid, $job-id),
       $pid := if ($has-pid) then normalize-space(file:read-text($filepath|| '.pid')) else (),
       $store := if ($has-pid) then st:set('pid', $runid, $pid) else (),
       $store-logs := if ($has-pid) then st:set('logs', $runid, element run {attribute run {$runid},element logs {}}) else (),
+      $is-queued := queue:is-queued($queue-job?id),
       $error-message := (
-        if (not($has-pid)) then 'Die Konvertierung wurde nicht korrekt gestartet. (Die PID konnte nicht gefunden werden)'
+        if (not($has-pid) and not($is-queued)) then 'Die Konvertierung wurde nicht korrekt gestartet. (Die PID konnte nicht gefunden werden, Job ist nicht in der Warteschlange.)'
       )
   return element run {
            element id {$runid},
@@ -424,18 +445,27 @@ declare function make:build-target-dir($converter as element(converter), $filena
   return $config:data-dir-base || '/' || $converter-id || '/' || $filename || '_' || $suffix || '/' 
 };
 
-declare function make:check-run($runid as xs:string) as xs:boolean{
+declare function make:check-run($runid as xs:string) as xs:string{
   let $pid := st:get('pid',$runid),
-      $result as element(result) := proc:execute('ps', ('-a', '-q', $pid))
-  return xs:boolean($result/code = '0')
+      $queue-id := st:get('queue-id',$runid), 
+      $result as element(result) := proc:execute('ps', ('-a', '-q', $pid)),
+      $is-running as xs:boolean := xs:boolean($result/code = '0'),
+      $is-queued as xs:boolean := if (array:size(queue:list()) gt 0) then exists(for $job in array:items(queue:list()) where $job?id eq $queue-id return $job) else false()
+  return (if ($is-running)
+          then 'running'
+          else
+            if ($is-queued)
+            then 'queued'
+            else 'stopped'
+         )
 };
 
 declare function make:stop-run($runid as xs:string) as xs:boolean{
   let $pid := st:get('pid',$runid),
       $result as element(result) := proc:execute('kill', ('-9', $pid)),
       $worked := xs:boolean($result/code = '0'),
-      $still-running := if (not($worked)) then make:check-run($runid) else false()
-  return if ($still-running) then false() else true()
+      $is-running := if (not($worked)) then make:check-run($runid) eq 'running' else false()
+  return if ($is-running) then false() else true()
 };
 
 declare function make:get-logs($runid){
@@ -451,7 +481,7 @@ declare function make:get-runs() as map(xs:string, map(xs:string,item()*))?{
     return
       map {
         $runid : map {
-          'running':make:check-run($runid), 
+          'status':make:check-run($runid), 
           'filename':st:get('filename', $runid),
           'params':st:get("params", $runid),
           'start':st:get("start", $runid),
@@ -495,19 +525,15 @@ declare function make:get-makefile-for-target($converter as element(converter), 
 
 declare function make:run-info-display($runid as xs:string, $run, $lang as xs:string, $converter-id as xs:string){
   let $filename as xs:string? := $run?filename,
-      $is-running as xs:boolean := xs:boolean($run?running),
       $start as xs:dateTime := xs:dateTime($run?start),
-      $running-text :=
-          if ($is-running)
-          then i18n:static-replacement('running',$lang)
-          else i18n:static-replacement('stopped',$lang)
+      $running-text := i18n:static-replacement($run?status,$lang)
   return 
     element div {
       attribute class {'run-info line'},
       element div {
         attribute class {'run-info running'},
         $running-text,
-        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/logs'), if ($is-running) then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
+        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/logs'), if ($run?status eq 'running') then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
       },
       element div {
         attribute class {'run-info starttime'},

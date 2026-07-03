@@ -1,5 +1,4 @@
 module namespace ns = 'http://le-tex.de/namespaces';
-
 (: 
  : all used module import statements to use in job:eval statements.
  :)
@@ -13,3 +12,4 @@ declare variable $ns:store := "import module namespace st = 'http://le-tex.de/st
 declare variable $ns:ns    := "import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';";
 declare variable $ns:data  := "import module namespace data = 'http://le-tex.de/data' at '/opt/basex/webapp/transpectui/data.xqm';";
 declare variable $ns:user  := "import module namespace u = 'http://le-tex.de/user' at '/opt/basex/webapp/transpectui/user.xqm';";
+declare variable $ns:queue := "import module namespace queue = 'http://le-tex.de/queue' at '/opt/basex/webapp/transpectui/queue.xqm';";

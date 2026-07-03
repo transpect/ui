@@ -12,7 +12,7 @@ declare function config:get-html-head($context) {
       attribute content {$context?refresh}
     }[$context?refresh gt 0],
     element title {
-      $context?title
+      $context?status || $context?title
     },
     element link {
       attribute rel {"stylesheet"},

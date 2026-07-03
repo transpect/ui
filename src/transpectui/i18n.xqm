@@ -61,6 +61,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Beendet</replacement>
       <replacement lang="en">Stopped</replacement>
     </static-replacement>
+    <static-replacement tag="queued">
+      <replacement lang="de">In der Warteschlange</replacement>
+      <replacement lang="en">Queued</replacement>
+    </static-replacement>
     <static-replacement tag="login">
       <replacement lang="de">Login</replacement>
       <replacement lang="en">Login</replacement>
@@ -72,6 +76,10 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="logs">
       <replacement lang="de">Logs</replacement>
       <replacement lang="en">Logs</replacement>
+    </static-replacement>
+    <static-replacement tag="queued-conversions">
+      <replacement lang="de">Warteschlange</replacement>
+      <replacement lang="en">Queued Conversions</replacement>
     </static-replacement>
     <static-replacement tag="running-conversions">
       <replacement lang="de">Laufende Konvertierungen</replacement>
