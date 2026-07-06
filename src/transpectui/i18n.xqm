@@ -61,9 +61,13 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Beendet</replacement>
       <replacement lang="en">Stopped</replacement>
     </static-replacement>
-    <static-replacement tag="queued">
+    <static-replacement tag="canceled">
+      <replacement lang="de">Abgebrochen</replacement>
+      <replacement lang="en">Canceled</replacement>
+    </static-replacement>
+    <static-replacement tag="pending">
       <replacement lang="de">In der Warteschlange</replacement>
-      <replacement lang="en">Queued</replacement>
+      <replacement lang="en">Pending</replacement>
     </static-replacement>
     <static-replacement tag="login">
       <replacement lang="de">Login</replacement>
@@ -77,9 +81,13 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Logs</replacement>
       <replacement lang="en">Logs</replacement>
     </static-replacement>
-    <static-replacement tag="queued-conversions">
+    <static-replacement tag="cancel">
+      <replacement lang="de">Abbrechen</replacement>
+      <replacement lang="en">Cancel</replacement>
+    </static-replacement>
+    <static-replacement tag="pending-conversions">
       <replacement lang="de">Warteschlange</replacement>
-      <replacement lang="en">Queued Conversions</replacement>
+      <replacement lang="en">Pending Conversions</replacement>
     </static-replacement>
     <static-replacement tag="running-conversions">
       <replacement lang="de">Laufende Konvertierungen</replacement>
@@ -92,6 +100,18 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="finished-conversions">
       <replacement lang="de">Beendete Konvertierungen</replacement>
       <replacement lang="en">Finished Conversions</replacement>
+    </static-replacement>
+    <static-replacement tag="empty-pending">
+      <replacement lang="de">Keine Konvertierungen in der Warteschlange</replacement>
+      <replacement lang="en">No Pending Conversions</replacement>
+    </static-replacement>
+    <static-replacement tag="empty-running">
+      <replacement lang="de">Keine Laufenden Konvertierungen</replacement>
+      <replacement lang="en">No Running Conversions</replacement>
+    </static-replacement>
+    <static-replacement tag="empty-finished">
+      <replacement lang="de">Keine Beendeten Konvertierungen</replacement>
+      <replacement lang="en">No Finished Conversions</replacement>
     </static-replacement>
   </static-replacements>;
 

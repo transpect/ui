@@ -34,7 +34,7 @@ declare function config:get-html-header($context as map(xs:string, item()?)) {
   element header {
     attribute class {'d-flex'},
     element a {
-      attribute href {config:url('/' || $context?lang || $context?url)},
+      attribute href {config:url('/' || $context?lang || $context?return-url)},
       element img {
         attribute class {"header"},
         attribute src {config:url("/static/transpect.png")}

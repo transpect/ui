@@ -202,6 +202,12 @@ div.content-log {
     margin-top:0px;
     margin-bottom:0px;
   }
+  
+  &.runid {
+    min-width:75px;
+    text-align: center;
+  }
+  
   &.running {
     display:flex;
     flex-direction: column;
@@ -210,7 +216,10 @@ div.content-log {
   }
   &.starttime {
     align-content:center;
-  };
+  }
+  &.cancel {
+    align-content:center;
+  }
 }
 
 .spacious {

@@ -28,7 +28,7 @@ declare %private function queue:log($text) {
   admin:write-log($text,'QUEUER')
 };
 
-declare function queue:is-queued($id) {
+declare function queue:is-pending($id) {
   for $job in array:items(queue:list())
   where $id eq $job?id
   return true()
@@ -59,7 +59,7 @@ declare %private function queue:get-running() {
       $running := job:list(),
       $matching :=
         for $id in $running
-        where job:list-details($id)/@state = ('running','queued')
+        where job:list-details($id)/@state = ('running','pending')
         where $id = $registered
         return $id
   return $matching
@@ -72,14 +72,16 @@ declare function queue:run() {
     let $job-map as map(*)? := queue:pop()
     return if (exists($job-map)) then queue:start-job($job-map)
   else (),
-  
-  if (not(job:list() = 'queuer1'))
-  then job:eval($ns:queue || "queue:run()", {}, map {'id':'queuer1', 'start': 'PT1S'})
-  else (),
-    
-  if (not(job:list() = 'queuer'))
-  then job:eval($ns:queue || "queue:run()", {}, map {'id':'queuer', 'start': 'PT1S'})
-  else ()
+  if (not(job:list() = ('queuer-0','queuer-1'))) (:neither:)
+  then job:eval($ns:queue || "queue:run()", {}, map {'id':'queuer-0', 'start': 'PT1S'})
+  else 
+    if (not(job:list() = 'queuer-1'))
+    then job:eval($ns:queue || "queue:run()", {}, map {'id':'queuer-1', 'start': 'PT1S'})
+    else (),
+      
+    if (not(job:list() = 'queuer-0'))
+    then job:eval($ns:queue || "queue:run()", {}, map {'id':'queuer-0', 'start': 'PT1S'})
+    else ()
     
 };
 
@@ -102,6 +104,14 @@ declare %private function queue:size() as xs:integer {
 
 declare %private function queue:is-full() as xs:boolean {
   queue:size() ge $queue:max
+};
+
+
+declare function queue:remove($id) {
+  let $queue := store:get($queue:key),
+      $removed := array:filter($queue, fn($entry) {$entry?id ne $id}),
+      $set := store:put($queue:key,$removed)
+  return count(array:filter(store:get($queue:key), fn($entry) {$entry?id eq $id})) eq 0
 };
 
 (: Remove all jobs :)

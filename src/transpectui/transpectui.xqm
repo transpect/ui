@@ -15,11 +15,11 @@ declare
   %rest:path("/{$lang}/login")
   %output:method("html")
   %output:html-version('5')
-function tr:login($lang as xs:string := 'de'){
+function tr:login($lang as xs:string){
   let $title := 'TranspectUI Login',
       $user := user:current(),
       $url := '/login',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': $url}
   return
     element html {
       config:get-html-head($context),
@@ -50,12 +50,12 @@ declare
   %rest:path("/{$lang}/converter")
   %output:method("html")
   %output:html-version('5')
-function tr:converter-list($lang as xs:string := 'de'){
+function tr:converter-list($lang as xs:string){
   let $title := 'TranspectUI',
       $header := request:header-map(),
       $converters as element(converter)* := conv:get-all(),
       $url := '/converter',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url}
   return
     if (count($converters) eq 1)
     then
@@ -104,8 +104,7 @@ declare
 function tr:error($error-message, $converter-id, $lang) {
   let $converter := conv:get($converter-id),
       $title := $converter/xs:string(@name),
-      $url := '/converter/' || $converter-id,
-      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':'/converter/' || $converter-id || '/error/' || $error-message, 'return-url':'/converter/' || $converter-id}
   return
     element html {
         config:get-html-head($context),
@@ -124,12 +123,11 @@ declare
   %rest:path("/{$lang}/converter/{$converter-id}")
   %output:method("html")
   %output:html-version('5')
-function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de'){
+function tr:converter-page($converter-id as xs:string, $lang as xs:string){
   let $converter := conv:get($converter-id),
       $title := $converter/xs:string(@name),
       $parameters := $converter/inputs/*,
-      $url := '/converter/' || $converter-id,
-      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':'/converter/' || $converter-id}
   return
     element html {
       config:get-html-head($context),
@@ -182,7 +180,7 @@ function tr:converter-page($converter-id as xs:string, $lang as xs:string := 'de
     }
 };
 
-declare function tr:parameter-to-html($input as element(*), $lang as xs:string := 'de'){
+declare function tr:parameter-to-html($input as element(*), $lang as xs:string){
   let $id := ($input/xs:string(@p-name),hf:id())[1],
       $name := i18n:name($input, $lang)
   return
