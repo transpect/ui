@@ -1,5 +1,6 @@
 module namespace hf = 'http://le-tex.de/helper-functions';
 import module namespace ns = 'http://le-tex.de/namespaces' at 'namespaces.xqm';
+import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 
 (: 
  : helper functions without any dependencies outside of the namespace list.
@@ -232,4 +233,45 @@ declare function hf:build-namespace-tree(
         for $import in $imports
         return hf:build-namespace-tree($inspected,$import, $upd-used-namespaces)
       }
+};
+
+declare function hf:parameter-to-html($input as element(*), $lang as xs:string){
+  let $id := ($input/xs:string(@p-name),hf:id())[1],
+      $name := i18n:name($input, $lang)
+  return
+    element form-group{
+      element label {$name || ':'},
+      switch (local-name($input))
+        case "input"
+        return 
+          $input update {
+            delete node @name,
+            insert node attribute placeholder {$name} into .,
+            insert node attribute name {$id} into .,
+            insert node attribute id {$id} into .,
+            insert node attribute class {'form-control'} into .
+          }
+        case "radiogroup"
+        return
+          for $radio at $index in $input/input[@type = 'radio']
+          let $sub-id := hf:id()
+          return
+            element div{
+              $radio update {
+                delete node @name,
+                insert node attribute name {$id} into .,
+                insert node attribute id {$sub-id} into .,
+                if ($index eq 1) then insert node attribute checked {} into .},
+              element label {
+                attribute "for" {$sub-id},
+                $radio/xs:string(@name)
+              }
+           }
+        case "select"
+        return
+          $input update {
+            insert node attribute id {$id} into .,
+            insert node attribute class {'form-control'} into .}
+        default return ()
+    }
 };

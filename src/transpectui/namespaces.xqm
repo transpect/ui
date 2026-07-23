@@ -13,3 +13,4 @@ declare variable $ns:ns    := "import module namespace ns = 'http://le-tex.de/na
 declare variable $ns:data  := "import module namespace data = 'http://le-tex.de/data' at '/opt/basex/webapp/transpectui/data.xqm';";
 declare variable $ns:user  := "import module namespace u = 'http://le-tex.de/user' at '/opt/basex/webapp/transpectui/user.xqm';";
 declare variable $ns:queue := "import module namespace queue = 'http://le-tex.de/queue' at '/opt/basex/webapp/transpectui/queue.xqm';";
+declare variable $ns:ui    := "import module namespace ui = 'http://le-tex.de/transpectui' at '/opt/basex/webapp/transpectui/transpectui.xqm';";

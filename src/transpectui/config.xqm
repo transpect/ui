@@ -1,5 +1,6 @@
 module namespace config = 'http://le-tex.de/config';
 import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
 
 declare variable $config:file := doc('config.xml');
 declare variable $config:data-dir-base := $config:file/configurations/configuration/data-dir-base/text();
@@ -55,7 +56,11 @@ declare function config:get-html-header($context as map(xs:string, item()?)) {
             attribute src {config:url('/static/' || $language/xs:string(@short) ||'.png')}
           }
         }
-      )
+      ),
+      if (session:get('username'))
+      then hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
+      else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
+
     }
   }
 }; 

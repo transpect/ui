@@ -97,6 +97,9 @@ img.header {
 .valid {
   background-color: #eeffee;
 }
+.red {
+  color:red;
+}
 .filename {
   margin:5px;
   max-width:49%;

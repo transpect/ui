@@ -70,8 +70,24 @@ declare variable $i18n:static-replacements :=
       <replacement lang="en">Pending</replacement>
     </static-replacement>
     <static-replacement tag="login">
-      <replacement lang="de">Login</replacement>
+      <replacement lang="de">Anmelden</replacement>
       <replacement lang="en">Login</replacement>
+    </static-replacement>
+    <static-replacement tag="not-allowed-message">
+      <replacement lang="de">Sie haben keinen Zugriff auf diese Ressource. Melden Sie sich mit einem anderen Nutzer an.</replacement>
+      <replacement lang="en">Access to that resource denied. Login with another User.</replacement>
+    </static-replacement>
+    <static-replacement tag="login-failed">
+      <replacement lang="de">Anmeldung fehlgeschlagen: Username/Passwort nicht korrekt.</replacement>
+      <replacement lang="en">Login failed: Username/Password not correct.</replacement>
+    </static-replacement>
+    <static-replacement tag="back">
+      <replacement lang="de">Zurück</replacement>
+      <replacement lang="en">Back</replacement>
+    </static-replacement>
+    <static-replacement tag="logout">
+      <replacement lang="de">Abmelden</replacement>
+      <replacement lang="en">Logout</replacement>
     </static-replacement>
     <static-replacement tag="result">
       <replacement lang="de">Ergebnis</replacement>

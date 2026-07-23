@@ -6,10 +6,20 @@ import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-func
 import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace st = 'http://le-tex.de/store' at 'store.xqm';
 import module namespace queue = 'http://le-tex.de/queue' at 'queue.xqm';
+import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 
 (: 
  : wrapper module for the orchestration of convertion runs.
  :)
+
+declare function make:check-only($right as xs:string?, $lang as xs:string, $return-url as xs:string?){
+  let $username := session:get('username'),
+      $token := session:get('token'),
+      $is-valid := u:validate-token($username, $token),
+      $is-allowed := if ($is-valid) then u:can-do(u:users($username), $right) else false(),
+      $log := hf:log($username || '+' || $right || '=' || $is-allowed,'CHECK')
+  return $is-allowed
+};
 
 declare
   %rest:GET
@@ -18,19 +28,39 @@ declare
   %output:html-version('5')
 function make:all-runs($converter-id as xs:string, $lang as xs:string){
   let $runs := make:get-runs(),
+      $username := session:get('username'),
+      $token := session:get('token'),
       $title := i18n:static-replacement('conversions',$lang),
+      $url := 'converter/' || $converter-id || '/runs',
       $context := map {'title': $title, 'lang': $lang, 'return-url':'/converter/' || $converter-id, 'url':'/converter/'|| $converter-id || '/runs'},
       $running-runs :=
         for $runid in map:keys($runs)
-        where xs:boolean($runs?$runid?status eq 'running')
+        where xs:boolean($runs?$runid?status eq 'running') and
+          (make:check-only($converter-id || ':' || 'convertions', $lang, $url)
+             or $runs?$runid?username eq session:get('username')
+             or (
+              let $my-groups := u:groups(session:get('username')),
+                  $run-groups := u:groups($runs?$runid?username),
+                  $needed-right := $converter-id || ':' || 'runs',
+                  $is-allowed := u:check($username, $token, $needed-right),
+                  $group-matches := $my-groups = $run-groups
+              return $is-allowed and $group-matches
+             )
+          )
         return $runid,
       $finished-runs :=
         for $runid in map:keys($runs)
-        where not(xs:boolean($runs?$runid?status = ('pending','running')))
+        where not(xs:boolean($runs?$runid?status = ('pending','running'))) and
+          (make:check-only($converter-id || ':' || 'convertions', $lang, $url)
+             or $runs?$runid?username eq session:get('username')
+          )
         return $runid,
       $pending-runs :=
         for $runid in map:keys($runs)
-        where xs:boolean($runs?$runid?status eq 'pending')
+        where xs:boolean($runs?$runid?status eq 'pending') and
+          (make:check-only($converter-id || ':' || 'convertions', $lang, $url)
+             or $runs?$runid?username eq session:get('username')
+          )
         return $runid
   return
     element html {
@@ -335,10 +365,11 @@ function make:post-conversion-action($runid, $filename, $action-name as xs:strin
   return $start
 };
 
-declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary)) as element(run) {
+declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary), $username as xs:string? := ()) as element(run) {
   let $makefile := make:get-makefile-for-target($converter, $targetname),
       $runid := hf:id(),
       $store := st:set('runid', $runid, $runid),
+      $store := st:set('username', $runid, $username),
       $store := st:set('start', $runid, current-dateTime()),
       $timestamp := xs:string(current-dateTime()) ! replace(.,':|\.','') ! replace(.,'T','_'),
       $dir := string-join(tokenize($makefile,'/')[position() ne last()],'/'),
