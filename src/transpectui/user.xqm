@@ -67,8 +67,8 @@ declare function u:users(){
   )
 };
 
-declare function u:users($username as xs:string) as element(user)? {
-  u:users()/user[username eq $username]
+declare function u:users($username as xs:string?) as element(user)? {
+  if ($username) then u:users()/user[username eq $username] else ()
 };
 
  declare function u:roles(){
@@ -83,8 +83,10 @@ declare function u:roles-for-user($user as element(user)) as xs:string* {
   $user/roles/role/xs:string(@name)
 };
 
-declare function u:roles-for-right($right as xs:string) as xs:string* {
-  u:roles()/role[right/@name eq $right]/xs:string(@name)
+declare function u:roles-for-right($right as xs:string?) as xs:string* {
+  if ($right)
+  then u:roles()/role[right/@name eq $right]/xs:string(@name)
+  else u:roles()/role/xs:string(@name)
 };
 
 declare function u:groups(){
@@ -93,8 +95,8 @@ declare function u:groups(){
   )
 };
 
-declare function u:groups($username as xs:string) as xs:string* {
-  u:users($username)/groups/group/xs:string(@name)
+declare function u:groups($username as xs:string?) as xs:string* {
+  if ($username) then u:users($username)/groups/group/xs:string(@name) else ()
 };
 
 declare function u:get-token($username as xs:string, $password as xs:string) as (element(token)|element(error)){
@@ -202,7 +204,7 @@ declare function u:set-password($username, $password) {
   return $updated-user      
 };
 
-declare function u:can-do($user as element(user), $right as xs:string) as xs:boolean {
+declare function u:can-do($user as element(user), $right as xs:string?) as xs:boolean {
   let $user-roles := $user/roles
   return
     let $matching-roles := 
@@ -229,12 +231,3 @@ declare function u:check($username as xs:string?, $token as xs:string?, $right a
       $is-allowed := if ($is-valid) then u:can-do(u:users($username), $right) else false()
   return $is-allowed
 };
-
-
-
-
-
-
-
-
-

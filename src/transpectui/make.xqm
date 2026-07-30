@@ -9,362 +9,8 @@ import module namespace queue = 'http://le-tex.de/queue' at 'queue.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 
 (: 
- : wrapper module for the orchestration of convertion runs.
+ : wrapper module for the orchestration of conversion runs.
  :)
-
-declare function make:check-only($right as xs:string?, $lang as xs:string, $return-url as xs:string?){
-  let $username := session:get('username'),
-      $token := session:get('token'),
-      $is-valid := u:validate-token($username, $token),
-      $is-allowed := if ($is-valid) then u:can-do(u:users($username), $right) else false(),
-      $log := hf:log($username || '+' || $right || '=' || $is-allowed,'CHECK')
-  return $is-allowed
-};
-
-declare
-  %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/runs")
-  %output:method("html")
-  %output:html-version('5')
-function make:all-runs($converter-id as xs:string, $lang as xs:string){
-  let $runs := make:get-runs(),
-      $username := session:get('username'),
-      $token := session:get('token'),
-      $title := i18n:static-replacement('conversions',$lang),
-      $url := 'converter/' || $converter-id || '/runs',
-      $context := map {'title': $title, 'lang': $lang, 'return-url':'/converter/' || $converter-id, 'url':'/converter/'|| $converter-id || '/runs'},
-      $running-runs :=
-        for $runid in map:keys($runs)
-        where xs:boolean($runs?$runid?status eq 'running') and
-          (make:check-only($converter-id || ':' || 'convertions', $lang, $url)
-             or $runs?$runid?username eq session:get('username')
-             or (
-              let $my-groups := u:groups(session:get('username')),
-                  $run-groups := u:groups($runs?$runid?username),
-                  $needed-right := $converter-id || ':' || 'runs',
-                  $is-allowed := u:check($username, $token, $needed-right),
-                  $group-matches := $my-groups = $run-groups
-              return $is-allowed and $group-matches
-             )
-          )
-        return $runid,
-      $finished-runs :=
-        for $runid in map:keys($runs)
-        where not(xs:boolean($runs?$runid?status = ('pending','running'))) and
-          (make:check-only($converter-id || ':' || 'convertions', $lang, $url)
-             or $runs?$runid?username eq session:get('username')
-          )
-        return $runid,
-      $pending-runs :=
-        for $runid in map:keys($runs)
-        where xs:boolean($runs?$runid?status eq 'pending') and
-          (make:check-only($converter-id || ':' || 'convertions', $lang, $url)
-             or $runs?$runid?username eq session:get('username')
-          )
-        return $runid
-  return
-    element html {
-      config:get-html-head($context),
-      element body {
-        config:get-html-header($context),
-        element div {
-          attribute class {'well'},
-          element div {
-            attribute class {'date spacious'},
-            i18n:static-replacement('called',$lang) || ': ' || hf:format-dateTime(current-dateTime())
-          },
-          element div {
-            attribute class {'well'},
-            i18n:static-replacement('pending-conversions',$lang) || ':',
-            if (count($pending-runs) eq 0)
-            then make:empty-run-info('empty-pending',$lang)
-            else
-              for $runid in $pending-runs
-              let $run as map(*) :=$runs?$runid
-              order by $run?start descending
-              return make:run-info-display($runid, $run, $lang, $converter-id)
-          },
-          element div {
-            attribute class {'well'},
-            i18n:static-replacement('running-conversions',$lang) || ':',
-            if (count($running-runs) eq 0)
-            then make:empty-run-info('empty-running',$lang)
-            else
-              for $runid in $running-runs
-              let $run as map(*) :=$runs?$runid
-              order by $run?start descending
-              return make:run-info-display($runid, $run, $lang, $converter-id)
-          },
-          element div {
-            attribute class {'well'},
-            i18n:static-replacement('finished-conversions',$lang) || ':',
-            if (count($finished-runs) eq 0)
-            then make:empty-run-info('empty-finished',$lang)
-            else
-              for $runid in $finished-runs
-              let $run as map(*) :=$runs?$runid
-              order by $run?start descending
-              return make:run-info-display($runid, $run, $lang, $converter-id)
-          }
-        }
-      }
-    }
-};
-
-declare
-  %rest:PUT
-  %rest:path("/log/{$runid}")
-  %rest:form-param('texts','{$texts}')
-function make:log-for-run($runid, $texts){
-  let $texts := tokenize($texts,';'),
-      $logs := for $text in $texts return element log {attribute timestamp {xs:string(current-dateTime())}, attribute id {substring(random:uuid(),1,8)}, $text},
-      $updated-logs := st:get('log',$runid) update {insert nodes $logs into logs}
-  return st:set('log', $runid, $updated-logs)
-};
-
-declare
-  %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/run/{$runid}/cancel")
-function make:stop-run-frontend($runid, $lang, $converter-id){
-  let $run := make:get-run($runid),
-      $cancel := make:stop-run($runid)
-  return web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/runs'))
-};
-
-declare
-  %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/run/{$runid}/logs")
-  %output:method("html")
-  %output:html-version('5')
-function make:log($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
-  let $converter as element(converter) := conv:get($converter-id),
-      $run-info as map(*) := make:get-run($runid),
-      $status as xs:string := $run-info?status,
-      $is-running as xs:boolean := $status eq 'running' or $status eq 'pending',
-      $parameters as xs:string* := $run-info?params,
-      $logs as xs:string* := make:get-logs($runid),
-      $short-status := switch ($status)
-                        case 'running' return '▶️'
-                        case 'pending' return '⏳'
-                        case 'stopped' return '✔️'
-                        default return '-',
-      $title as xs:string? := $run-info?filename,
-      $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)),
-      $refresh := if ($is-running) then 5 else (),
-      $context := map {'lang': $lang, 'title': $title, 'status': $short-status || ' ', 'refresh': $refresh, 'return-url': '/converter/' || $converter-id, 'url': '/converter/' || $converter-id || '/run/' || $runid || '/logs' , 'subtitle':$subtitle},
-      $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
-      $logs := make:get-file-logs($run-info?file)
-  return
-    if ($is-running)
-    then
-      element html {
-        config:get-html-head($context),
-        element body {
-          config:get-html-header($context),
-          element div {
-            element div {
-              attribute class {'well'},
-              element h3 {i18n:val($status,$lang)}
-            },
-            element details {
-              attribute class {'make-parameters well'},
-              element summary {'Parameters'},
-              element ul {
-                for $p in $parameters
-                return
-                  element li {
-                    $p
-                  }
-              }
-            },
-            element details {
-              attribute class {'make-logs well'},
-              if ($status eq 'running') then attribute open {} else (),
-              element summary {i18n:val('logs',$lang)},
-              for $log at $index in $logs
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {attribute class {'time'}, hf:format-dateTime($log?time)},
-                element span {$log?text}
-              }
-            }
-          }
-        }
-      }
-  else web:redirect('../' || $runid || '/result')
-};
-
-declare
-  %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/run/{$runid}/result")
-  %output:method("html")
-  %output:html-version('5')
-function make:result($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
-  let $converter as element(converter) := conv:get($converter-id),
-      $job-results := make:store-job-messages($runid),
-      $run-info as map(*) := make:get-run($runid),
-      $status as xs:string := $run-info?status,
-      $is-running as xs:boolean := $status eq 'running',
-      $parameters as xs:string* := $run-info?params,
-      $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
-      $logs :=
-        if (file:exists($log-dir))
-        then
-          for $file in file:list($log-dir)
-          let $mod-by := file:last-modified($log-dir || '/' || $file)
-          order by $mod-by
-          where file:exists($log-dir || '/' ||$file)
-          return map {'text': file:read-text($log-dir || '/' ||$file),'time': $mod-by}
-        else (),
-      $title as xs:string? := $run-info?filename,
-      $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)),
-      $refresh := if ($is-running) then 1 else (),
-      $context := map {'lang': $lang, 'title': $run-info?filename, 'refresh': $refresh, 'return-url': '/converter/' || $converter-id, 'url': '/converter/' || $converter-id || '/run/' || $runid || '/result', 'subtitle':$subtitle},
-      $post-conv-actions := conv:get-post-conv-actions($converter),
-      $out-path := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $result-files :=
-        for $file in file:list($out-path)
-        where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
-        return {'name': normalize-space($file), 'path': $out-path || normalize-space($file)}
-  return
-    element html {
-      config:get-html-head($context),
-      element body {
-        config:get-html-header($context),
-        element div {
-          element div {
-            attribute class {'well'},
-            element h3 {i18n:val($status,$lang)}
-          },
-          element details {
-            attribute class {'make-parameters well'},
-            element summary {'Parameters'},
-            element ul {
-              for $p in $parameters
-              return
-                element li {
-                  $p
-                }
-            }
-          },
-          element details {
-            attribute class {'make-logs well'},
-            if ($is-running) then attribute open {} else (),
-            element summary {i18n:val('logs',$lang)},
-            for $log at $index in $logs
-            return element div {
-              attribute class {'log-entry'},
-              element span {attribute class {'index'}, $index},
-              element span {attribute class {'time'}, hf:format-dateTime($log?time)},
-              element span {$log?text}
-            }
-          },
-          element details {
-            attribute class {'well'},
-            attribute open {},
-            element summary {i18n:val('results',$lang)},
-            for $file in $result-files
-            let $extention := ($file?name => tokenize('[\./]'))[last()],
-                $show-direct as xs:boolean := $extention = ('xhtml','html')
-            return element div {
-              attribute class {'line d-flex'},
-              element div {
-                attribute class {'filename'},
-                if ($show-direct)
-                then
-                  element a {
-                    attribute href {config:url('/run/' ||$runid || '/show/' || $file?name)},
-                    attribute target {'_blank'},
-                    $file?name}
-                else
-                  element a {
-                    attribute href {config:url('/run/' ||$runid || '/download/' || $file?name)},
-                    attribute target {'_blank'},
-                    attribute download {$file?name},
-                    $file?name}},
-              element div {
-                attribute class {'actions'},
-                for $action in $post-conv-actions
-                where matches($file?name, $action/xs:string(@regex))
-                return
-                  element input{
-                    attribute type {'button'},
-                    attribute value {$action/xs:string(@message)},
-                    attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
-                  }
-              }
-            }
-          },
-          element details {
-            attribute class {'well'},
-            element summary {i18n:val('run',$lang)},
-            element div {
-              attribute class {'overflow'},
-              for $m  at $index in $job-results
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {$m}
-              }
-            }
-          }
-        }
-      }
-    }
-};
-
-
-declare
-  %rest:GET
-  %rest:path("/run/{$runid}/download/{$filename}")
-function make:download($runid, $filename) {
-  let $outpath := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $filepath := $outpath || $filename,
-      $filesize := file:size($filepath),
-      $format := $filename ! tokenize('.')[last()],
-      $data := file:read-binary($filepath)
-  return
-      (web:response-header(
-        map { 'media-type': 'application/' || $format},
-        map { 'Content-Disposition': 'attachement;filename=' || $filename,
-              'Content-Length': $filesize }),
-       $data)
-};
-
-declare
-  %rest:GET
-  %rest:path("/run/{$runid}/show/{$filename}")
-  %output:method("html")
-  %output:html-version('5')
-function make:show($runid, $filename) {
-  let $outpath := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $filepath := $outpath || $filename,
-      $filesize := file:size($filepath),
-      $extention := ($filename => tokenize('[\./]'))[last()],
-      $show-direct as xs:boolean := $extention = ('xhtml','html'),
-      $format := $filename ! tokenize('.')[last()],
-      $data := if ($show-direct) then doc($filepath) else file:read-binary($filepath),
-      $log := admin:write-log($filename || ': ' || $extention || ': ' || xs:string($show-direct))
-  return if ($show-direct) then $data else web:error('415','Das Dokument kann nicht angezeigt werden.')
-};
-
-declare
-  %rest:GET
-  %rest:path("/run/{$runid}/{$filename}/action/{$action-name}")
-function make:post-conversion-action($runid, $filename, $action-name as xs:string) {
-  let $outpath := st:get('params', $runid)[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $filepath := $outpath || $filename,
-      $converter := make:get-converter($runid),
-      $actions := conv:get-post-conv-actions($converter),
-      $action := $actions[@target eq $action-name],
-      $start :=
-        if ($action)
-        then make:start-target($action-name, $converter, $filepath, $runid, make:format-target-parameters(map {'IN_FILE': $filepath}))
-        else 'No action specified'
-  return $start
-};
-
 declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary), $username as xs:string? := ()) as element(run) {
   let $makefile := make:get-makefile-for-target($converter, $targetname),
       $runid := hf:id(),
@@ -410,20 +56,15 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       $store := st:set('params', $runid, $parameters),
       $queue-job :=
         queue:register(
-          "declare variable $parameters external; declare variable $options external; proc:execute('make',$parameters,$options)",
+          $ns:store || " declare variable $parameters external; declare variable $options external; proc:execute('make',$parameters,$options), st:set('status', '" || $runid || "', 'stopped')",
           map {'parameters':$parameters,'options':$options},
           map {'cache':true(), 'id':hf:id('make-target')},
-          $ns:store || "declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id)"),
+          $ns:store || "declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')"),
       $wait := prof:sleep(1000),
       $store := st:set('queue-id',$runid,$queue-job?id),
-      $has-pid := file:exists($filepath|| '.pid'),
-      $pid := if ($has-pid) then normalize-space(file:read-text($filepath|| '.pid')) else (),
-      $store := if ($has-pid) then st:set('pid', $runid, $pid) else (),
-      $store-logs := if ($has-pid) then st:set('logs', $runid, element run {attribute run {$runid},element logs {}}) else (),
       $is-pending := queue:is-pending($queue-job?id),
-      $error-message := (
-        if (not($has-pid) and not($is-pending)) then 'Die Konvertierung wurde nicht korrekt gestartet. (Die PID konnte nicht gefunden werden, Job ist nicht in der Warteschlange.)'
-      )
+      $store := if ($is-pending) then st:set('status',$runid, 'pending'),
+      $error-message := ()
   return element run {
            element id {$runid},
            element error {string-join($error-message,' ')} [$error-message]
@@ -470,23 +111,8 @@ declare function make:build-target-dir($converter as element(converter), $filena
   return $config:data-dir-base || '/' || $converter-id || '/' || $filename || '_' || $suffix || '/' 
 };
 
-declare function make:check-run($runid as xs:string) as xs:string{
-  let $pid := st:get('pid',$runid),
-      $queue-id := st:get('queue-id',$runid), 
-      $result as element(result) := proc:execute('ps', ('-a', '-q', $pid)),
-      $is-running as xs:boolean := xs:boolean($result/code = '0'),
-      $is-pending as xs:boolean := if (array:size(queue:list()) gt 0) then exists(for $job in array:items(queue:list()) where $job?id eq $queue-id return $job) else false()
-  return (if ($is-running)
-          then 'running'
-          else
-            if ($is-pending)
-            then 'pending'
-            else 'stopped'
-         )
-};
-
 declare function make:stop-run($runid) {
-  let $run := (make:get-run($runid),{})[1],
+  let $run := (st:get-run($runid),{})[1],
       $status := $run?status
   return
     switch ($status)
@@ -517,27 +143,18 @@ declare function make:get-converter($runid) as element(converter)?{
   conv:get(st:get("converter",$runid))
 };
 
-declare function make:get-run($runid) as map(xs:string,item()*) {
-  map {
-    'runid':st:get('runid',$runid),
-    'status':(st:get('status', $runid),make:check-run($runid))[1], 
-    'filename':st:get('filename', $runid),
-    'params':st:get("params", $runid),
-    'start':st:get("start", $runid),
-    'file':st:get("file", $runid),
-    'pid':st:get("pid", $runid),
-    'job-id':st:get("job-id", $runid),
-    'queue-id':st:get('queue-id',$runid),
-    'converter': st:get("converter", $runid)}
-};
 
 declare function make:get-runs() as map(xs:string, map(xs:string,item()*))?{
   map:merge (
-    for $runid in st:get-runs() ! tokenize(.,'/')[1]
+    for $runid in st:list()
     return
-      map {$runid: make:get-run($runid)}
+      map {$runid: st:get-run($runid)}
   )
 };
+
+declare function make:get-run($runid as xs:string?) as map(xs:string,item()*)? {
+  st:get-run($runid)
+}; 
 
 declare function make:get-output($runid as xs:string) as xs:string{
   let $converter-id as xs:string := st:get('converter', $runid),
@@ -580,7 +197,7 @@ declare function make:empty-run-info($tag, $lang) {
   }
 };
 
-declare function make:run-info-display($runid as xs:string, $run, $lang as xs:string, $converter-id as xs:string){
+declare function make:run-info-display($runid as xs:string, $run, $lang as xs:string, $converter-id as xs:string, $context as map(*)){
   let $filename as xs:string? := $run?filename,
       $start as xs:dateTime := xs:dateTime($run?start),
       $running-text := i18n:static-replacement($run?status,$lang)
@@ -606,7 +223,7 @@ declare function make:run-info-display($runid as xs:string, $run, $lang as xs:st
       },
       element div {
         attribute class {'run-info cancel'},
-        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/cancel'), i18n:static-replacement("cancel",$lang))
+        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/cancel' || '?url=/' || $lang || $context?url), i18n:static-replacement("cancel",$lang))
       }[not($run?status = ('stopped','canceled'))]
     }
 };

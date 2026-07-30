@@ -39,6 +39,9 @@ form-group {
   display:flex;
   justify-content:space-between;
   flex-direction:row;
+  &.column {
+    flex-direction:column;
+  }
 }
 
 @media (max-width: 800px) {
@@ -215,7 +218,7 @@ div.content-log {
     display:flex;
     flex-direction: column;
     align-items:center;
-    min-width: 100px;
+    min-width: 120px;
   }
   &.starttime {
     align-content:center;
@@ -228,4 +231,10 @@ div.content-log {
 .spacious {
   margin-left: 35px;
   padding:10px;
+}
+.breadcrumbs {
+  margin: 0 20px 20px;
+  & span:not(:first-child)::before{
+    content: " → ";
+  }
 }

@@ -77,9 +77,17 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Sie haben keinen Zugriff auf diese Ressource. Melden Sie sich mit einem anderen Nutzer an.</replacement>
       <replacement lang="en">Access to that resource denied. Login with another User.</replacement>
     </static-replacement>
+    <static-replacement tag="not-logged-in-message">
+      <replacement lang="de">Sie sind nicht angemeldet, bitte melden Sie sich an.</replacement>
+      <replacement lang="en">You are not logged in. Log in.</replacement>
+    </static-replacement>
     <static-replacement tag="login-failed">
       <replacement lang="de">Anmeldung fehlgeschlagen: Username/Passwort nicht korrekt.</replacement>
       <replacement lang="en">Login failed: Username/Password not correct.</replacement>
+    </static-replacement>
+    <static-replacement tag="user-preferences">
+      <replacement lang="de">Nutzer-Einstellungen</replacement>
+      <replacement lang="en">User Preferences</replacement>
     </static-replacement>
     <static-replacement tag="back">
       <replacement lang="de">Zurück</replacement>
