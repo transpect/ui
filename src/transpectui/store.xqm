@@ -21,7 +21,7 @@ declare function st:set($prefix, $runid, $value){
 
 declare function st:get($prefix, $runid){
   if (store:keys() = $st:cache-key)
-  then st:get-from-cache($prefix, $runid)
+  then (st:check-cache-age(), st:get-from-cache($prefix, $runid))
   else
     let $file := "/opt/data/runs/" || $runid || '/' || $prefix
     return
@@ -66,14 +66,14 @@ declare function st:rebuild-cache(){
   return store:put($st:cache-key,$runs)
 };
 
-declare function st:check-cache-age(){
+declare %private function st:check-cache-age(){
   if (current-dateTime() - store:get($st:cache-age-key) ge $st:cache-max-age)
   then (admin:write-log('Store Cache is too old.','CACHE-AGE'),
         st:rebuild-cache()
         )
 };
 
-declare function st:set-in-cache($prefix, $runid, $value) {
+declare %private function st:set-in-cache($prefix, $runid, $value) {
   let $all := store:get($st:cache-key),
       $rest := $all[not(.?runid eq $runid)],
       $prev := $all[.?runid eq $runid],
@@ -81,6 +81,6 @@ declare function st:set-in-cache($prefix, $runid, $value) {
   return store:put($st:cache-key, ($all,$new))
 };
 
-declare function st:get-from-cache($prefix, $runid) {
+declare %private function st:get-from-cache($prefix, $runid) {
   store:get($st:cache-key)[.?runid eq $runid]?$prefix
 };

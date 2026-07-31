@@ -148,6 +148,6 @@ declare function i18n:static-replacement($tag, $lang) {
 
 declare function i18n:name($input, $lang as xs:string := 'de') as xs:string{
   let $name := ($input/@*[local-name(.) eq 'name-' || $lang], $input/@name, $input/@name-en, $input/@name-en)[1] => xs:string(),
-      $log := admin:write-log($lang || $name)
+      $log := admin:write-log($lang || ': ' ||  $name,'i18n')
   return $name
 };

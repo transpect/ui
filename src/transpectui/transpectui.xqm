@@ -154,7 +154,7 @@ function ui:converter-runs($converter-id as xs:string, $lang as xs:string){
              )
           )
         return $runid,
-      $log := admin:write-log(string-join($allowed-runs,',') || ':','ALLOWED'),
+      (:$log := admin:write-log(string-join($allowed-runs,',') || ':','ALLOWED'),:)
       $running-runs :=
         for $runid in $allowed-runs
         where xs:boolean($runs?$runid?status eq 'running')
