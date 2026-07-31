@@ -73,12 +73,12 @@ declare %private function st:check-cache-age(){
         )
 };
 
-declare %private function st:set-in-cache($prefix, $runid, $value) {
-  let $all := store:get($st:cache-key),
-      $rest := $all[not(.?runid eq $runid)],
-      $prev := $all[.?runid eq $runid],
-      $new := map:put($prev,$prefix,$value)
-  return store:put($st:cache-key, ($all,$new))
+declare %private function st:set-in-cache($prefix as xs:string, $runid as xs:string, $value as item()*) {
+  let $all as map(*)* :=  store:get($st:cache-key),
+      $rest as map(*)* := $all[not(.?runid eq $runid)],
+      $prev as map(*)? := $all[.?runid eq $runid],
+      $new := if (exists($prev)) then map:put($prev,$prefix,$value) else map {$prefix: $value}
+  return store:put($st:cache-key, ($rest,$new))
 };
 
 declare %private function st:get-from-cache($prefix, $runid) {

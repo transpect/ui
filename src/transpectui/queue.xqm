@@ -109,7 +109,7 @@ declare %private function queue:get-running() {
       $matching :=
         for $id in $running
         where job:list-details($id)/@state = ('running','pending')
-        where exists($registered[.?id eq id])
+        where exists($registered[.?id eq $id])
         return $id
   return $matching
 };

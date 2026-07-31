@@ -56,7 +56,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       $store := st:set('params', $runid, $parameters),
       $queue-job :=
         queue:register(
-          $ns:store || " declare variable $parameters external; declare variable $options external; proc:execute('make',$parameters,$options), st:set('status', '" || $runid || "', 'stopped')",
+          $ns:store || " declare variable $parameters external; declare variable $options external; proc:execute('make',$parameters,$options), st:set('status', '" || $runid || "', 'stopped'), st:set('end', '" || $runid || "', job:execute('current-dateTime()'))",
           map {'parameters':$parameters,'options':$options},
           map {'cache':true(), 'id':hf:id('make-target')},
           $ns:store || "declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')"),
@@ -197,7 +197,7 @@ declare function make:empty-run-info($tag, $lang) {
   }
 };
 
-declare function make:run-info-display($runid as xs:string, $run, $lang as xs:string, $converter-id as xs:string, $context as map(*)){
+declare function make:run-info-display($runid as xs:string, $run as map(*), $lang as xs:string, $converter-id as xs:string, $context as map(*)){
   let $filename as xs:string? := $run?filename,
       $start as xs:dateTime := xs:dateTime($run?start),
       $running-text := i18n:static-replacement($run?status,$lang)
@@ -207,7 +207,7 @@ declare function make:run-info-display($runid as xs:string, $run, $lang as xs:st
       element div {
         attribute class {'run-info running'},
         $running-text,
-        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/logs'), if ($run?status eq 'running') then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
+        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/runs/' || $runid), if ($run?status eq 'running') then i18n:static-replacement("logs",$lang) else i18n:static-replacement("results",$lang))
       },
       element div {
         attribute class {'run-info runid'},
@@ -223,7 +223,7 @@ declare function make:run-info-display($runid as xs:string, $run, $lang as xs:st
       },
       element div {
         attribute class {'run-info cancel'},
-        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/run/' || $runid || '/cancel' || '?url=/' || $lang || $context?url), i18n:static-replacement("cancel",$lang))
+        hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/runs/' || $runid || '/cancel' || '?url=/' || $lang || $context?url), i18n:static-replacement("cancel",$lang))
       }[not($run?status = ('stopped','canceled'))]
     }
 };

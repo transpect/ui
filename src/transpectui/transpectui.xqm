@@ -187,7 +187,7 @@ function ui:converter-runs($converter-id as xs:string, $lang as xs:string){
             else
               for $runid in $pending-runs
               let $run as map(*) :=$runs?$runid
-              order by $run?start descending
+              order by xs:dateTime($run?start) descending
               return make:run-info-display($runid, $run, $lang, $converter-id, $context)
           },
           element div {
@@ -198,7 +198,7 @@ function ui:converter-runs($converter-id as xs:string, $lang as xs:string){
             else
               for $runid in $running-runs
               let $run as map(*) :=$runs?$runid
-              order by $run?start descending
+              order by xs:dateTime($run?start) descending
               return make:run-info-display($runid, $run, $lang, $converter-id, $context)
           },
           element div {
@@ -209,7 +209,7 @@ function ui:converter-runs($converter-id as xs:string, $lang as xs:string){
             else
               for $runid in $finished-runs
               let $run as map(*) :=$runs?$runid
-              order by $run?start descending
+              order by xs:dateTime($run?start) descending
               return make:run-info-display($runid, $run, $lang, $converter-id, $context)
           }
         }
@@ -231,7 +231,7 @@ function ui:converter-convert($converter-id as xs:string, $file as map(xs:string
       $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file, session:get('username')) 
   return if ($run/error)
          then web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error)) 
-         else web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/runs/'   || $run/id || '/logs'))
+         else web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/runs/'   || $run/id))
 };
 
 declare
@@ -247,7 +247,7 @@ function ui:stop-run-frontend($runid, $lang, $converter-id, $return-url){
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}/logs")
+  %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}")
   %output:method("html")
   %output:html-version('5')
 function ui:log($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
@@ -263,83 +263,15 @@ function ui:log($converter-id as xs:string, $runid as xs:string, $lang as xs:str
                         case 'stopped' return '✔️'
                         default return '-',
       $title as xs:string? := $run-info?filename,
-      $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)),
+      $start as xs:dateTime := xs:dateTime($run-info?start),
+      $end as xs:dateTime? := if (exists($run-info?end)) then xs:dateTime($run-info?end) else (),
+      $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
       $refresh := if ($is-running) then 5 else (),
-      $url := '/converter/' || $converter-id || '/runs/' || $runid || '/logs',
+      $url := '/converter/' || $converter-id || '/runs/' || $runid,
       $context := map {'lang': $lang, 'title': $title, 'status': $short-status || ' ', 'refresh': $refresh, 'return-url': '/converter/' || $converter-id, 'url': $url , 'subtitle':$subtitle},
       $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
-      $logs := make:get-file-logs($run-info?file)
-  return (
-    ui:check('', $lang, $url),
-    if ($is-running)
-    then
-      element html {
-        config:get-html-head($context),
-        element body {
-          config:get-html-header($context),
-          element div {
-            element div {
-              attribute class {'well'},
-              element h3 {i18n:val($status,$lang)},
-              hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/runs/' || $runid || '/cancel' || '?url=/' || $lang || $url), i18n:static-replacement("cancel",$lang))[not($run-info?status = ('stopped','canceled'))]
-            },
-            element details {
-              attribute class {'make-parameters well'},
-              element summary {'Parameters'},
-              element ul {
-                for $p in $parameters
-                return
-                  element li {
-                    $p
-                  }
-              }
-            },
-            element details {
-              attribute class {'make-logs well'},
-              if ($status eq 'running') then attribute open {} else (),
-              element summary {i18n:val('logs',$lang)},
-              for $log at $index in $logs
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {attribute class {'time'}, hf:format-dateTime($log?time)},
-                element span {$log?text}
-              }
-            }
-          }
-        }
-      }
-  else web:redirect('../' || $runid || '/result')
-  )
-};
-
-declare
-  %rest:GET
-  %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}/result")
-  %output:method("html")
-  %output:html-version('5')
-function ui:result($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
-  let $converter as element(converter) := conv:get($converter-id),
+      $logs := make:get-file-logs($run-info?file),
       $job-results := make:store-job-messages($runid),
-      $run-info as map(*) := make:get-run($runid),
-      $status as xs:string := $run-info?status,
-      $is-running as xs:boolean := $status eq 'running',
-      $parameters as xs:string* := $run-info?params,
-      $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
-      $logs :=
-        if (file:exists($log-dir))
-        then
-          for $file in file:list($log-dir)
-          let $mod-by := file:last-modified($log-dir || '/' || $file)
-          order by $mod-by
-          where file:exists($log-dir || '/' ||$file)
-          return map {'text': file:read-text($log-dir || '/' ||$file),'time': $mod-by}
-        else (),
-      $title as xs:string? := $run-info?filename,
-      $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)),
-      $refresh := if ($is-running) then 1 else (),
-      $url := '/converter/' || $converter-id || '/runs/' || $runid || '/result',
-      $context := map {'lang': $lang, 'title': $run-info?filename, 'refresh': $refresh, 'return-url': '/converter/' || $converter-id, 'url': $url, 'subtitle':$subtitle},
       $post-conv-actions := conv:get-post-conv-actions($converter),
       $out-path := $run-info?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $result-files :=
@@ -355,7 +287,8 @@ function ui:result($converter-id as xs:string, $runid as xs:string, $lang as xs:
         element div {
           element div {
             attribute class {'well'},
-            element h3 {i18n:val($status,$lang)}
+            element h3 {i18n:val($status,$lang)},
+            hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/runs/' || $runid || '/cancel' || '?url=/' || $lang || $url), i18n:static-replacement("cancel",$lang))[not($run-info?status = ('stopped','canceled'))]
           },
           element details {
             attribute class {'make-parameters well'},
@@ -370,7 +303,7 @@ function ui:result($converter-id as xs:string, $runid as xs:string, $lang as xs:
           },
           element details {
             attribute class {'make-logs well'},
-            if ($is-running) then attribute open {} else (),
+            if ($status eq 'running') then attribute open {} else (),
             element summary {i18n:val('logs',$lang)},
             for $log at $index in $logs
             return element div {
@@ -380,61 +313,60 @@ function ui:result($converter-id as xs:string, $runid as xs:string, $lang as xs:
               element span {$log?text}
             }
           },
-          element details {
-            attribute class {'well'},
-            attribute open {},
-            element summary {i18n:val('results',$lang)},
-            for $file in $result-files
-            let $extention := ($file?name => tokenize('[\./]'))[last()],
-                $show-direct as xs:boolean := $extention = ('xhtml','html')
-            return element div {
-              attribute class {'line d-flex'},
-              element div {
-                attribute class {'filename'},
-                if ($show-direct)
-                then
-                  element a {
-                    attribute href {config:url('/runs/' ||$runid || '/show/' || $file?name)},
-                    attribute target {'_blank'},
-                    $file?name}
-                else
-                  element a {
-                    attribute href {config:url('/runs/' ||$runid || '/download/' || $file?name)},
-                    attribute target {'_blank'},
-                    attribute download {$file?name},
-                    $file?name}},
-              element div {
-                attribute class {'actions'},
-                for $action in $post-conv-actions
-                where matches($file?name, $action/xs:string(@regex))
-                return
-                  element input{
-                    attribute type {'button'},
-                    attribute value {$action/xs:string(@message)},
-                    attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
-                  }
-              }
-            }
-          },
-          element details {
-            attribute class {'well'},
-            element summary {i18n:val('run',$lang)},
+        element details {
+          attribute class {'well'},
+          if ($status eq 'stopped') then attribute open {} else (),
+          element summary {i18n:val('results',$lang)},
+          for $file in $result-files
+          let $extention := ($file?name => tokenize('[\./]'))[last()],
+              $show-direct as xs:boolean := $extention = ('xhtml','html')
+          return element div {
+            attribute class {'line d-flex'},
             element div {
-              attribute class {'overflow'},
-              for $m  at $index in $job-results
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {$m}
-              }
+              attribute class {'filename'},
+              if ($show-direct)
+              then
+                element a {
+                  attribute href {config:url('/runs/' ||$runid || '/show/' || $file?name)},
+                  attribute target {'_blank'},
+                  $file?name}
+              else
+                element a {
+                  attribute href {config:url('/runs/' ||$runid || '/download/' || $file?name)},
+                  attribute target {'_blank'},
+                  attribute download {$file?name},
+                  $file?name}},
+            element div {
+              attribute class {'actions'},
+              for $action in $post-conv-actions
+              where matches($file?name, $action/xs:string(@regex))
+              return
+                element input{
+                  attribute type {'button'},
+                  attribute value {$action/xs:string(@message)},
+                  attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
+                }
             }
           }
+        },
+        element details {
+          attribute class {'well'},
+          element summary {i18n:val('run',$lang)},
+          element div {
+            attribute class {'overflow'},
+            for $m  at $index in $job-results
+            return element div {
+              attribute class {'log-entry'},
+              element span {attribute class {'index'}, $index},
+              element span {$m}
+            }
+          }
+        }
         }
       }
     }
   )
 };
-
 
 declare
   %rest:GET

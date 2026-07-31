@@ -169,6 +169,20 @@ declare function hf:format-dateTime($dateTime as xs:dateTime) as xs:string {
   format-dateTime($dateTime,'[D,2].[M,2].[Y,4] [H,2]:[m,2]:[s,2]')
 };
 
+declare function hf:format-duration($duration as xs:dayTimeDuration) as xs:string {
+  let $days := days-from-duration($duration),
+      $hours := hours-from-duration($duration),
+      $minutes := minutes-from-duration($duration),
+      $seconds := seconds-from-duration($duration)
+  return
+    ($days || 'd ')[$days gt 0] ||
+    string-join((
+      $hours[$hours gt 0 or $days gt 0],
+      format-integer($minutes,"00"),
+      format-number($seconds,"00.0")
+    ),':')
+};
+
 declare function hf:inspect-namespaces(){
   let $base-uri := '/opt/basex/webapp/transpectui/',
       $files := file:list($base-uri)[matches(.,'\.xqm')],
