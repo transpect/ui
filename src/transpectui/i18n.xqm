@@ -19,8 +19,14 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Vorherige Konvertierungen</replacement>
       <replacement lang="en">Previous Conversions</replacement>
     </static-replacement>
-    <static-replacement tag="submit">
+    <static-replacement tag="submit-file">
       <replacement lang="de">Hochladen</replacement>
+      <replacement lang="en">Submit</replacement>
+      <replacement lang="es">Entregar</replacement>
+      <replacement lang="fr">Télécharger</replacement>
+    </static-replacement>
+    <static-replacement tag="submit">
+      <replacement lang="de">Abschicken</replacement>
       <replacement lang="en">Submit</replacement>
       <replacement lang="es">Entregar</replacement>
       <replacement lang="fr">Télécharger</replacement>
@@ -136,6 +142,38 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="empty-finished">
       <replacement lang="de">Keine Beendeten Konvertierungen</replacement>
       <replacement lang="en">No Finished Conversions</replacement>
+    </static-replacement>
+    <static-replacement tag="sessions">
+      <replacement lang="de">Sitzungen</replacement>
+      <replacement lang="en">Sessions</replacement>
+    </static-replacement>
+    <static-replacement tag="roles">
+      <replacement lang="de">Rollen</replacement>
+      <replacement lang="en">Roles</replacement>
+    </static-replacement>
+    <static-replacement tag="password">
+      <replacement lang="de">Passwort</replacement>
+      <replacement lang="en">Password</replacement>
+    </static-replacement>
+    <static-replacement tag="add">
+      <replacement lang="de">hinzufügen</replacement>
+      <replacement lang="en">add</replacement>
+    </static-replacement>
+    <static-replacement tag="remove">
+      <replacement lang="de">entfernen</replacement>
+      <replacement lang="en">remove</replacement>
+    </static-replacement>
+    <static-replacement tag="delete">
+      <replacement lang="de">Löschen</replacement>
+      <replacement lang="en">Delete</replacement>
+    </static-replacement>
+    <static-replacement tag="user">
+      <replacement lang="de">Nutzer</replacement>
+      <replacement lang="en">Users</replacement>
+    </static-replacement>
+    <static-replacement tag="new-user">
+      <replacement lang="de">Neuen Nutzer anlegen</replacement>
+      <replacement lang="en">Create New User</replacement>
     </static-replacement>
   </static-replacements>;
 

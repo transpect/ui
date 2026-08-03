@@ -67,7 +67,7 @@ declare function config:get-html-header($context as map(xs:string, item()?)) {
           element div {
             attribute class {'d-flex column'},
             attribute style {'margin-top: -5px;'},
-            hf:create-anchor(config:url('/' || $context?lang || '/user/'|| session:get('username') || '?url=' || config:url($context?url)),session:get('username'),'lang-img'),
+            hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?url=' || config:url($context?url)),session:get('username'),'lang-img'),
             hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
           }
         else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')

@@ -37,7 +37,10 @@ declare function st:get($prefix, $runid){
 
 declare function st:list($use-cache as xs:boolean? := true()) as xs:string* {
   if ($use-cache)
-  then for $run in store:get($st:cache-key) return $run?runid
+  then
+    if (store:keys() = $st:cache-key)
+    then for $run in store:get($st:cache-key) return $run?runid
+    else st:rebuild-cache()
   else 
     let $runids := file:list("/opt/data/runs") ! tokenize(.,'/')[1]
     return
@@ -62,8 +65,9 @@ declare function st:rebuild-cache(){
   store:put($st:cache-age-key,current-dateTime()),
   let $runs :=
         for $runid in st:list(false())
-        return st:get-run($runid)
-  return store:put($st:cache-key,$runs)
+        return st:get-run($runid),
+      $store := store:put($st:cache-key,$runs)
+  return st:list(false())
 };
 
 declare %private function st:check-cache-age(){

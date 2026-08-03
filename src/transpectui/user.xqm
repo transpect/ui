@@ -84,9 +84,18 @@ declare function u:roles-for-user($user as element(user)) as xs:string* {
 };
 
 declare function u:roles-for-right($right as xs:string?) as xs:string* {
-  if ($right)
-  then u:roles()/role[right/@name eq $right]/xs:string(@name)
-  else u:roles()/role/xs:string(@name)
+  distinct-values((
+    if ($right)
+    then u:roles()/role[right/@name eq $right]/xs:string(@name)
+    else u:roles()/role/xs:string(@name),
+    
+    for $role in u:roles()/role
+      where
+      	if (exists($role/right/@matches))
+        then exists($role/right[matches($right,@matches)])
+        else false()
+    return $role/xs:string(@name)
+  ))
 };
 
 declare function u:groups(){
@@ -124,7 +133,7 @@ declare function u:new-user($username as xs:string, $password as xs:string, $rol
     return $new-user
 };
 
-declare %private function u:create-new-user-object($username as xs:string, $password as xs:string? := (),  $roles as xs:string* := (),  $groups as xs:string* := ()) as (element(user)|element(error)){
+declare  function u:create-new-user-object($username as xs:string, $password as xs:string? := (),  $roles as xs:string* := (),  $groups as xs:string* := ()) as (element(user)|element(error)){
   let $salt := random:uuid(),
       $hashed := hash(concat($salt,($password,random:uuid())[1]),map:entry('algorithm','SHA-256')),
       $new-user :=  element user {
@@ -169,14 +178,14 @@ declare function u:add-role($username, $rolename) {
   return
     if (exists($user/roles/role[@name eq $rolename]))
     then true()
-    else u:write-users-file(u:users() update {insert node element role {attribute name {$rolename}} into users/user[username eq $username]/roles})
+    else u:write-users-file(doc($u:users-file) update {insert node element role {attribute name {$rolename}} into users/user[username eq $username]/roles})
 };
 
 declare function u:delete-role($username, $rolename) {
   let $user := u:users()/user[username eq $username]
   return
     if (exists($user/roles/role[@name eq $rolename]))
-    then u:write-users-file(u:users() update {delete node users/user[username eq $username]/roles/role[@name eq $rolename]})
+    then u:write-users-file(doc($u:users-file) update {delete node users/user[username eq $username]/roles/role[@name eq $rolename]})
     else true()
 };
 
@@ -197,12 +206,19 @@ declare function u:delete-group($username, $groupname) {
 };
 
 declare function u:set-password($username, $password) {
-  let $updated-user := u:new-user($username,$password),
+  let $user-exists-in-file := doc($u:users-file)//user[username eq $username],
+      $updated-user := u:create-new-user-object($username,$password),
       $users := if (file:exists($u:users-file)) then doc($u:users-file) else element users {},
-      $add-user := $users update {insert node $updated-user into .},
+      $add-user :=
+        if ($user-exists-in-file)
+        then $users update {
+          replace node users/user[username eq $username]/password with $updated-user/password,
+          replace node users/user[username eq $username]/salt with $updated-user/salt}
+        else $users update {insert node $updated-user into .},
       $write := u:write-users-file($add-user)
-  return $updated-user      
+  return $add-user/users/user[username eq $username]
 };
+
 
 declare function u:can-do($user as element(user), $right as xs:string?) as xs:boolean {
   let $user-roles := $user/roles
