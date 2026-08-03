@@ -751,7 +751,7 @@ function ui:user-management($lang){
               element div {
                 attribute class {'d-flex'},
                 ui:create-anchor($user/username,'/' || $lang || '/users/' || $user/username),
-                ui:create-anchor(i18n:val('delete',$lang),'/' || $lang || '/users/' || $user/username || '/delete') 
+                ui:create-anchor(i18n:val('delete',$lang),'/' || $lang || '/users/' || $user/username || '/delete?url=' || $url) 
               }
           }
         },
@@ -761,23 +761,33 @@ function ui:user-management($lang){
           element form {
             attribute method {'POST'},
             attribute action {'/' || $lang || '/users/new?url=' || $url},
-            element div {
+            element form-group {
+              attribute class {'form-group'},
+              element label {
+                attribute for {'username'},
+                i18n:val('username',$lang)
+              },
               element input {
-                attribute class {'form-control'},
+                attribute class {'form-control line '},
                 attribute type {'text'},
                 attribute name {'username'}
               }
             },
-            element div {
+            element form-group {
+              attribute class {'form-group'},
+              element label {
+                attribute for {'password'},
+                i18n:val('password',$lang)
+              },
               element input {
-                attribute class {'form-control'},
+                attribute class {'form-control line'},
                 attribute type {'password'},
                 attribute name {'password'}
               }
             },
-            element div {
+            element form-group {
               element input {
-                attribute class {'form-control'},
+                attribute class {'form-control line'},
                 attribute type {'submit'},
                 attribute value {i18n:val('submit',$lang)}
               }

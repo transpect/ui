@@ -133,7 +133,7 @@ declare function u:new-user($username as xs:string, $password as xs:string, $rol
     return $new-user
 };
 
-declare  function u:create-new-user-object($username as xs:string, $password as xs:string? := (),  $roles as xs:string* := (),  $groups as xs:string* := ()) as (element(user)|element(error)){
+declare %private function u:create-new-user-object($username as xs:string, $password as xs:string? := (),  $roles as xs:string* := (),  $groups as xs:string* := ()) as (element(user)|element(error)){
   let $salt := random:uuid(),
       $hashed := hash(concat($salt,($password,random:uuid())[1]),map:entry('algorithm','SHA-256')),
       $new-user :=  element user {
@@ -231,7 +231,7 @@ declare function u:can-do($user as element(user), $right as xs:string?) as xs:bo
     return count($matching-roles) gt 0  
 };
 
-declare function u:can-do-details($user, $right) as element(role)* {
+declare %private function u:can-do-details($user, $right) as element(role)* {
 let $user-roles := $user/roles
   return
     let $matching-roles := 

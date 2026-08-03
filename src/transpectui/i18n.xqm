@@ -155,6 +155,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Passwort</replacement>
       <replacement lang="en">Password</replacement>
     </static-replacement>
+    <static-replacement tag="username">
+      <replacement lang="de">Nutzername</replacement>
+      <replacement lang="en">Username</replacement>
+    </static-replacement>
     <static-replacement tag="add">
       <replacement lang="de">hinzufügen</replacement>
       <replacement lang="en">add</replacement>
