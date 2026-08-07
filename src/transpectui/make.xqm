@@ -11,7 +11,7 @@ import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 (: 
  : wrapper module for the orchestration of conversion runs.
  :)
-declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string), $files as map(xs:string, xs:base64Binary), $username as xs:string? := ()) as element(run) {
+declare function make:start-target-run($targetname as xs:string, $converter as element(converter), $target-parameters as map(xs:string,xs:string)*, $files as map(xs:string, xs:base64Binary), $username as xs:string? := ()) as element(run) {
   let $makefile := make:get-makefile-for-target($converter, $targetname),
       $runid := hf:id(),
       $store := st:set('runid', $runid, $runid),
@@ -95,10 +95,8 @@ declare function make:start-target($target-name as xs:string, $converter as elem
       $log := for $key in map:keys($options) return hf:log('--opt: ' || $key || ': ' || $options?$key,'┃'),
       
       
-      $job-id := hf:eval((), "proc:fork('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target' || $target-name)}),
-      $wait := prof:sleep(1000),
-      $pid := normalize-space(file:read-text($filepath|| '.pid'))
-  return $pid
+      $job-id := hf:eval((), "proc:fork('make',$parameters,$options)", map {'parameters':$parameters,'options':$options}, map {'cache':true(), 'id':hf:id('make-target' || $target-name)})
+  return $job-id
 };
 
 declare function make:format-target-parameters($target-parameters as map(xs:string,xs:string)) as xs:string*{
@@ -144,6 +142,32 @@ declare function make:get-converter($runid) as element(converter)?{
 };
 
 
+
+
+declare function make:list-runs() as xs:string*{
+  st:list()
+};
+
+declare function make:allowed($username as xs:string*, $run as map(xs:string, xs:string*)){
+  let $converter-id := $run?converter
+  return 
+      (u:can-do(u:users($username),$converter-id || ':runs')
+   or ($run?username eq $username))
+   or (
+      let $my-groups := u:groups($username),
+          $run-groups :=
+            if ($run?username)
+            then u:groups($run?username)
+            else (),
+          $group-matches := $my-groups = $run-groups
+      return count($group-matches) gt 0
+   )
+};
+
+declare function make:get-run($runid as xs:string?) as map(xs:string,item()*)? {
+  st:get-run($runid)
+}; 
+
 declare function make:get-runs() as map(xs:string, map(xs:string,item()*))?{
   map:merge (
     for $runid in st:list()
@@ -151,11 +175,6 @@ declare function make:get-runs() as map(xs:string, map(xs:string,item()*))?{
       map {$runid: st:get-run($runid)}
   )
 };
-
-declare function make:get-run($runid as xs:string?) as map(xs:string,item()*)? {
-  st:get-run($runid)
-}; 
-
 declare function make:get-output($runid as xs:string) as xs:string{
   let $converter-id as xs:string := st:get('converter', $runid),
       $converter as element(converter) := conv:get($converter-id),
@@ -174,6 +193,7 @@ declare function make:get-targets($makefile as element(*)) as element(*)?{
         for $t in $targets
         return insert node element target {$t} into .
       }
+  else $makefile
 };
 
 declare function make:extend-converter($converter as element(converter)) as element(converter){
@@ -200,7 +220,8 @@ declare function make:empty-run-info($tag, $lang) {
 declare function make:run-info-display($runid as xs:string, $run as map(*), $lang as xs:string, $converter-id as xs:string, $context as map(*)){
   let $filename as xs:string? := $run?filename,
       $start as xs:dateTime := xs:dateTime($run?start),
-      $running-text := i18n:static-replacement($run?status,$lang)
+      $running-text := i18n:static-replacement($run?status,$lang),
+      $username := $run?username
   return 
     element div {
       attribute class {'run-info line'},
@@ -220,6 +241,10 @@ declare function make:run-info-display($runid as xs:string, $run as map(*), $lan
       element div {
         attribute class {'run-info file'},
         $filename
+      },
+      element div {
+        attribute class {'run-info username'},
+        $username
       },
       element div {
         attribute class {'run-info cancel'},

@@ -83,6 +83,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Sie haben keinen Zugriff auf diese Ressource. Melden Sie sich mit einem anderen Nutzer an.</replacement>
       <replacement lang="en">Access to that resource denied. Login with another User.</replacement>
     </static-replacement>
+    <static-replacement tag="no-cred-message">
+      <replacement lang="de">Es wurde kein Authorization-Header angegeben.</replacement>
+      <replacement lang="en">No Authorization Header found.</replacement>
+    </static-replacement>
     <static-replacement tag="not-logged-in-message">
       <replacement lang="de">Sie sind nicht angemeldet, bitte melden Sie sich an.</replacement>
       <replacement lang="en">You are not logged in. Log in.</replacement>
@@ -90,6 +94,18 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="login-failed">
       <replacement lang="de">Anmeldung fehlgeschlagen: Username/Passwort nicht korrekt.</replacement>
       <replacement lang="en">Login failed: Username/Password not correct.</replacement>
+    </static-replacement>
+    <static-replacement tag="token-invalid">
+      <replacement lang="de">Das angegebene Token ist nicht gültig.</replacement>
+      <replacement lang="en">The supplied token is not valid.</replacement>
+    </static-replacement>
+    <static-replacement tag="basic-auth-disabled">
+      <replacement lang="de">Anmeldung per Username/Passwort ist nicht erlaubt.</replacement>
+      <replacement lang="en">Authnetication via username/password is not allowed.</replacement>
+    </static-replacement>
+    <static-replacement tag="bearer-auth-disabled">
+      <replacement lang="de">Anmeldung per Token ist nicht erlaubt.</replacement>
+      <replacement lang="en">Authnetication via tokens is not allowed.</replacement>
     </static-replacement>
     <static-replacement tag="user-preferences">
       <replacement lang="de">Nutzer-Einstellungen</replacement>
@@ -178,6 +194,14 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="new-user">
       <replacement lang="de">Neuen Nutzer anlegen</replacement>
       <replacement lang="en">Create New User</replacement>
+    </static-replacement>
+    <static-replacement tag="api-tut-get-token">
+      <replacement lang="de">Ein TOKEN via /api/de/token/get holen und als Authorization-Header benutzen: -H "Authorization: Bearer TOKEN"</replacement>
+      <replacement lang="en">Get a TOKEN via /api/en/token/get and use it as authorization header: -H "Authorization: Bearer TOKEN"</replacement>
+    </static-replacement>
+    <static-replacement tag="api-tut-get-converter">
+      <replacement lang="de">Information zu Konvertern: /api/de/converter oder eines bestimmten Konverters: /api/de/converter/CONVERTER-ID</replacement>
+      <replacement lang="en">Get Information about converters: /api/de/converter or of a specific converter: /api/en/converter/CONVERTER-ID</replacement>
     </static-replacement>
   </static-replacements>;
 

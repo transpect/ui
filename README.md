@@ -15,7 +15,6 @@ BaseX based UI for transpect converters. Currently uses BaseX 11.
 
 ### Necessary Modifications to Conversion Makefiles
 * `conversion` target definition must end with a colon (`:`)
-* add line `echo $$PPID > $(IN_FILE).pid` as first command in conversion target
 
 ### Running TranspectUI
 

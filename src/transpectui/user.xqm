@@ -98,6 +98,10 @@ declare function u:roles-for-right($right as xs:string?) as xs:string* {
   ))
 };
 
+declare function u:username-for-token($token-string as xs:string) as xs:string? {
+  u:get-token($token-string)?username
+};
+
 declare function u:groups(){
   distinct-values(
     u:users()/groups/group/xs:string(@name)
@@ -108,15 +112,13 @@ declare function u:groups($username as xs:string?) as xs:string* {
   if ($username) then u:users($username)/groups/group/xs:string(@name) else ()
 };
 
-declare function u:get-token($username as xs:string, $password as xs:string) as (element(token)|element(error)){
-  if (u:validate-password($username, $password))
-  then
-    let $token := 'trui-' || random:uuid(),
-        $token-map := map {'username': $username, 'token': $token, 'timestamp': current-dateTime()},
-        $prev-tokens := store:get('user-' || $username || '-tokens')[.?timestamp],
-        $store := store:put('user-' || $username || '-token',($prev-tokens,$token-map))
-    return element token {(for $key in ('username','timestamp') return attribute {$key} {$token-map?$key}),xs:string($token)}
-  else element error { attribute code {'400'},'Username/Password not correct.'}
+declare function u:get-new-token($username as xs:string) as (element(token)|element(error)){
+  let $token := 'trui-' || random:uuid(),
+      $token-map := map {'username': $username, 'token': $token, 'timestamp': current-dateTime()},
+      $prev-tokens := u:get-tokens($username)[exists(.?timestamp)],
+      $store := u:put-tokens($username,($prev-tokens,$token-map)),
+      $log := admin:write-log('create new token for ' || $username)
+  return element token {(for $key in ('username','timestamp') return attribute {$key} {$token-map?$key}),xs:string($token)}
 };
 
 (: 
@@ -168,9 +170,54 @@ declare function u:validate-password($username as xs:string, $password as xs:str
 };
 
 declare function u:validate-token($username as xs:string?, $token as xs:string?) as xs:boolean {
-  let $is-valid := exists(store:get('user-' || $username || '-token')[convert:dateTime-to-integer(.?timestamp) + $u:token-max-age gt convert:dateTime-to-integer(current-dateTime())]),
-      $update := if ($is-valid) then store:put('user-' || $username || '-token', map:put(store:get('user-' || $username || '-token'),'timestamp',current-dateTime())) else ()
+  let $prev-tokens := u:get-tokens($username),
+      $matched-token := $prev-tokens[.?token eq $token],
+      $is-valid := if (exists($matched-token)) then u:validate-token-bg($matched-token) else false(),
+      $rest := $prev-tokens[not(.?token eq $token)],
+      $updated-token := u:update-token($prev-tokens,$token, $username, $is-valid) 
   return $is-valid
+};
+
+declare function u:validate-token($token-string as xs:string?) as xs:boolean {
+  if (not(exists($token-string)))
+  then false()
+  else
+    let $token-keys := store:keys()[matches(.,'user-[^-]+-tokens')],
+        $tokens :=
+          for $k in $token-keys
+          return store:get($k),
+        $matching as map(*)* := $tokens
+          [.?token eq $token-string],
+        $is-valid as xs:boolean := exists($matching),
+        $update :=
+          for $m in $matching
+          let $username := $m?username,
+              $is-valid := u:validate-token-bg($m)
+          return u:update-token($tokens[.?username eq $username], $token-string, $username, $is-valid)
+    return $is-valid
+};
+
+declare %private function u:get-token($token-string as xs:string?) as map(*)? {
+  let $token-keys := store:keys()[matches(.,'user-[^-]+-tokens')],
+      $tokens :=
+        for $k in $token-keys
+        return store:get($k),
+      $matching as map(*)* := $tokens
+        [.?token eq $token-string]
+  return $matching
+};
+
+declare function u:clear-tokens($username) {
+  u:put-tokens($username,())
+};
+
+ (:
+  : Shortcut for u:validate-token and u:can-do
+  :)
+declare function u:check($username as xs:string?, $token as xs:string?, $right as xs:string?) {
+  let $is-valid := u:validate-token($username, $token),
+      $is-allowed := if ($is-valid) then u:can-do(u:users($username), $right) else false()
+  return $is-allowed
 };
 
 declare function u:add-role($username, $rolename) {
@@ -220,7 +267,7 @@ declare function u:set-password($username, $password) {
 };
 
 
-declare function u:can-do($user as element(user), $right as xs:string?) as xs:boolean {
+declare function u:can-do($user as element(user)?, $right as xs:string?) as xs:boolean {
   let $user-roles := $user/roles
   return
     let $matching-roles := 
@@ -229,6 +276,25 @@ declare function u:can-do($user as element(user), $right as xs:string?) as xs:bo
          or (if (exists($user-role/@matches)) then matches($right, $user-role/@matches) else false())
       return $user-role
     return count($matching-roles) gt 0  
+};
+
+declare %private function u:get-tokens($username) {
+  store:get('user-' || $username || '-tokens')
+};
+
+declare %private function u:put-tokens($username, $tokens) {
+  store:put('user-' || $username || '-tokens', $tokens)
+};
+
+declare %private function u:validate-token-bg($token as map(*)) as xs:boolean {
+  ($token?timestamp => convert:dateTime-to-integer() + $u:token-max-age) gt convert:dateTime-to-integer(current-dateTime())
+};
+
+declare %private function u:update-token($tokens as map(*)*,$token-string as xs:string?, $username as xs:string?, $is-valid as xs:boolean) {
+  let $token := $tokens[.?token eq $token-string],
+      $rest := $tokens[not(.?token eq $token-string)],
+      $updated-token := if ($is-valid) then map:put($token,'timestamp',current-dateTime()) else ()
+  return u:put-tokens($username, ($rest,$updated-token))
 };
 
 declare %private function u:can-do-details($user, $right) as element(role)* {
@@ -240,10 +306,4 @@ let $user-roles := $user/roles
          or (if (exists($user-role/@matches)) then matches($right, $user-role/@matches) else false())
       return $user-role
     return $matching-roles
-};
-
-declare function u:check($username as xs:string?, $token as xs:string?, $right as xs:string?) {
-  let $is-valid := u:validate-token($username, $token),
-      $is-allowed := if ($is-valid) then u:can-do(u:users($username), $right) else false()
-  return $is-allowed
 };

@@ -14,3 +14,8 @@ declare variable $ns:data  := "import module namespace data = 'http://le-tex.de/
 declare variable $ns:user  := "import module namespace u = 'http://le-tex.de/user' at '/opt/basex/webapp/transpectui/user.xqm';";
 declare variable $ns:queue := "import module namespace queue = 'http://le-tex.de/queue' at '/opt/basex/webapp/transpectui/queue.xqm';";
 declare variable $ns:ui    := "import module namespace ui = 'http://le-tex.de/transpectui' at '/opt/basex/webapp/transpectui/transpectui.xqm';";
+
+declare function ns:install() {
+  for $ns in ($ns:api, $ns:conv, $ns:config, $ns:hf, $ns:i18n, $ns:make, $ns:store, $ns:ns, $ns:data, $ns:user, $ns:queue, $ns:ui)
+  return repo:install($ns => replace(".* at '|';",''))
+};

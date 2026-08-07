@@ -155,6 +155,14 @@ declare function hf:map-to-list($map as map(*)){
   for $key in map:keys($map)
   return $map?$key
 };
+declare function hf:map-to-xml($map as map(*)){
+  for $key in map:keys($map)
+  let $content := $map?$key
+  return 
+    if (count($content) eq 1)
+    then element {$key} {$content}
+    else element {$key} {$content ! element line {.}}
+};
 
 declare function hf:create-anchor($href,$text as xs:string? := (), $classes as xs:string* := ()) {
   element a {
@@ -179,7 +187,7 @@ declare function hf:format-duration($duration as xs:dayTimeDuration) as xs:strin
     string-join((
       $hours[$hours gt 0 or $days gt 0],
       format-integer($minutes,"00"),
-      format-number($seconds,"00.0")
+      format-number($seconds,"00")
     ),':')
 };
 

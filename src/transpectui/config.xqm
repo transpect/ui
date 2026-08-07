@@ -37,7 +37,7 @@ declare function config:get-html-header($context as map(xs:string, item()?)) {
     element div {
     attribute class {'d-flex'},
       element a {
-        attribute href {config:url('/' || $context?lang || $context?return-url)},
+        attribute href {config:url('/' || $context?lang || '/converter')},
         element img {
           attribute class {"header"},
           attribute src {config:url("/static/transpect.png")}
@@ -77,7 +77,7 @@ declare function config:get-html-header($context as map(xs:string, item()?)) {
       attribute class {'breadcrumbs'},
       let $parts := $context?url => tokenize('/')
       return 
-        for $part at $i in $parts[normalize-space(.)][position() ne last()]
+        for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
         return element span {hf:create-anchor(config:url(('/' || $context?lang, string-join($parts[position() le $i + 1],'/'))),$part)}
     }
   }

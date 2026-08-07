@@ -3,5 +3,9 @@
   <configuration>
     <data-dir-base>/opt/data</data-dir-base>
     <base-url></base-url>
+    <api>
+      <allow-basic-auth>false</allow-basic-auth>
+      <allow-bearer-auth>true</allow-bearer-auth>
+    </api>
   </configuration>
 </configurations>
