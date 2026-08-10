@@ -217,9 +217,77 @@ function api:clear-tokens($lang as xs:string){
     else api:error(i18n:val($authed/messages/text(),$lang))
 }; 
 
+declare
+  %rest:POST
+  %rest:path("/api/{$lang}/users/new")
+  %rest:form-param("password","{$password}")
+  %rest:form-param("username","{$username-to-create}")
+  %output:method("html")
+  %output:html-version('5')
+function api:user-new($lang,$username-to-create,$password){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username as xs:string := $authed/username,
+      $user := u:users($username),
+      $right := 'u:mgmt',
+      $can-do := u:can-do($user, $right),
+      $do-update := if ($can-do) then u:new-user($username-to-create, $password) else (),
+      $log := if ($can-do) then hf:log('create new user: ' ||$username-to-create)
+  return $do-update
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/users")
+  %output:method("html")
+  %output:html-version('5')
+function api:user-get($lang){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username as xs:string := $authed/username,
+      $user := u:users($username),
+      $right := 'u:mgmt',
+      $can-do := u:can-do($user, $right),
+      $get := if ($can-do) then u:users()
+  return $get
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/users/{$username-to-get}")
+  %output:method("html")
+  %output:html-version('5')
+function api:user-get($lang,$username-to-get){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username as xs:string := $authed/username,
+      $user := u:users($username),
+      $right := 'u:mgmt',
+      $can-do := u:can-do($user, $right, $username-to-get),
+      $get := if ($can-do) then u:users($username-to-get)
+  return $get
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/users/{$username-to-delete}/delete")
+  %output:method("html")
+  %output:html-version('5')
+function api:user-new($lang,$username-to-delete){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username as xs:string := $authed/username,
+      $user := u:users($username),
+      $right := 'u:mgmt',
+      $can-do := u:can-do($user, $right, $username-to-delete),
+      $do-update := if ($can-do) then u:delete-user($username-to-delete) else (),
+      $log := if ($can-do) then hf:log('delete user: ' ||$username-to-delete)
+  return $do-update
+};
+
 declare %private function api:converter($converter-id as xs:string, $username as xs:string, $lang as xs:string) {
   let $user := u:users($username),
-      $converter := if (u:can-do($user,$converter-id || ':convert')) then conv:get($converter-id) else element error {i18n:val('not-allowed-message', $lang)}
+      $converter := if (u:can-do($user, $converter-id || ':convert')) then conv:get($converter-id) else element error {i18n:val('not-allowed-message', $lang)}
   return $converter
 };
 
