@@ -61,14 +61,22 @@ declare %private function u:merge($users-default as element(users)*,$users-file 
 };
 
 declare function u:users(){
+  u:users-int() update {delete node .//password, delete node .//salt}
+};
+
+declare function u:users($username as xs:string?){
+  u:users-int($username) update {delete node .//password, delete node .//salt}
+};
+
+declare %private function u:users-int(){
   u:merge(
     $u:default-users,
     if (file:exists($u:users-file)) then doc($u:users-file)/users
   )
 };
 
-declare function u:users($username as xs:string?) as element(user)? {
-  if ($username) then u:users()/user[username eq $username] else ()
+declare %private function u:users-int($username as xs:string?) as element(user)? {
+  if ($username) then u:users-int()/user[username eq $username] else ()
 };
 
  declare function u:roles(){
@@ -76,7 +84,7 @@ declare function u:users($username as xs:string?) as element(user)? {
 };
 
 declare function u:roles-for-username($username as xs:string) as xs:string* {
-  u:users($username)/roles/role/xs:string(@name)
+  u:users-int($username)/roles/role/xs:string(@name)
 };
 
 declare function u:roles-for-user($user as element(user)) as xs:string* {
@@ -104,12 +112,12 @@ declare function u:username-for-token($token-string as xs:string) as xs:string? 
 
 declare function u:groups(){
   distinct-values(
-    u:users()/groups/group/xs:string(@name)
+    u:users-int()/groups/group/xs:string(@name)
   )
 };
 
 declare function u:groups($username as xs:string?) as xs:string* {
-  if ($username) then u:users($username)/groups/group/xs:string(@name) else ()
+  if ($username) then u:users-int($username)/groups/group/xs:string(@name) else ()
 };
 
 declare function u:get-new-token($username as xs:string) as (element(token)|element(error)){
@@ -125,11 +133,11 @@ declare function u:get-new-token($username as xs:string) as (element(token)|elem
  : Create a new User and add it to the Users file
  :)
 declare function u:new-user($username as xs:string, $password as xs:string, $roles as xs:string* := (), $groups as xs:string* := ()) as (element(user)|element(error)) {
-  if (exists(u:users()/user[@source eq 'file'][username/text() eq $username]))
+  if (exists(u:users-int()/user[@source eq 'file'][username/text() eq $username]))
   then element error { attribute code {'400'},'User "'|| $username ||'" exists already'}
   else
     let $new-user :=  u:create-new-user-object($username, $password, $roles, $groups),
-        $users as element(users) := u:users(),
+        $users as element(users) := u:users-int(),
         $add-user := $users update {insert node $new-user into .},
         $write := u:write-users-file($add-user)
     return $new-user
@@ -163,7 +171,7 @@ declare %private function u:write-users-file($users) {
 };
 
 declare function u:validate-password($username as xs:string, $password as xs:string) as xs:boolean {
-  let $user := u:users($username),
+  let $user := u:users-int($username),
       $salt := $user/salt/text(),
       $hash := xs:string(hash(concat($salt,$password),map:entry('algorithm','SHA-256')))
   return xs:boolean($hash eq $user/password/text())
@@ -216,12 +224,12 @@ declare function u:clear-tokens($username) {
   :)
 declare function u:check($username as xs:string?, $token as xs:string?, $right as xs:string?) {
   let $is-valid := u:validate-token($username, $token),
-      $is-allowed := if ($is-valid) then u:can-do(u:users($username), $right) else false()
+      $is-allowed := if ($is-valid) then u:can-do(u:users-int($username), $right) else false()
   return $is-allowed
 };
 
 declare function u:add-role($username, $rolename) {
-  let $user := u:users()/user[username eq $username]
+  let $user := u:users-int($username)
   return
     if (exists($user/roles/role[@name eq $rolename]))
     then true()
@@ -229,7 +237,7 @@ declare function u:add-role($username, $rolename) {
 };
 
 declare function u:delete-role($username, $rolename) {
-  let $user := u:users()/user[username eq $username]
+  let $user := u:users-int($username)
   return
     if (exists($user/roles/role[@name eq $rolename]))
     then u:write-users-file(doc($u:users-file) update {delete node users/user[username eq $username]/roles/role[@name eq $rolename]})
@@ -237,18 +245,18 @@ declare function u:delete-role($username, $rolename) {
 };
 
 declare function u:add-group($username, $groupname) {
-  let $user := u:users()/user[username eq $username]
+  let $user := u:users-int($username)
   return
     if (exists($user/groups/group[@name eq $groupname]))
     then true()
-    else u:write-users-file(u:users() update {insert node element group {attribute name {$groupname}} into users/user[username eq $username]/groups})
+    else u:write-users-file(u:users-int() update {insert node element group {attribute name {$groupname}} into users/user[username eq $username]/groups})
 };
 
 declare function u:delete-group($username, $groupname) {
-  let $user := u:users()/user[username eq $username]
+  let $user := u:users-int($username)
   return
     if (exists($user/groups/group[@name eq $groupname]))
-    then u:write-users-file(u:users() update {delete node users/user[username eq $username]/groups/group[@name eq $groupname]})
+    then u:write-users-file(u:users-int() update {delete node users/user[username eq $username]/groups/group[@name eq $groupname]})
     else true()
 };
 
@@ -267,7 +275,7 @@ declare function u:set-password($username, $password) {
 };
 
 
-declare function u:can-do($user as element(user)?, $right as xs:string?) as xs:boolean {
+declare function u:can-do($user as element(user)?, $right as xs:string, $owner-name as xs:string? := ()) as xs:boolean {
   let $user-roles := $user/roles
   return
     let $matching-roles := 
@@ -275,7 +283,7 @@ declare function u:can-do($user as element(user)?, $right as xs:string?) as xs:b
       where (u:roles-for-right($right) = u:roles-for-username($user/username))
          or (if (exists($user-role/@matches)) then matches($right, $user-role/@matches) else false())
       return $user-role
-    return count($matching-roles) gt 0  
+    return ((count($matching-roles) gt 0) or ($owner-name eq $user/username/text()))  
 };
 
 declare %private function u:get-tokens($username) {
