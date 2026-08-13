@@ -274,7 +274,6 @@ declare function u:set-password($username, $password) {
   return $add-user/users/user[username eq $username]
 };
 
-
 declare function u:can-do($user as element(user)?, $right as xs:string, $owner-name as xs:string? := ()) as xs:boolean {
   let $user-roles := $user/roles
   return

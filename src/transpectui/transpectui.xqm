@@ -7,9 +7,9 @@ import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 
 declare function ui:check($right as xs:string?, $lang as xs:string, $return-url as xs:string?, $owner as xs:string? := ()){
-  let $is-logged-in := exists(session:get('username')),
+  let $is-logged-in := exists(ui:access-session('username')),
       $is-allowed := ui:check-only($right, $owner),
-      $log := hf:log($right || ': ' || session:get('username') || ' => ' || $is-allowed,'CHECK')
+      $log := hf:log($right || ': ' || ui:access-session('username') || ' => ' || $is-allowed,'CHECK')
   return
     if ($is-logged-in)
     then if ($is-allowed)
@@ -19,9 +19,9 @@ declare function ui:check($right as xs:string?, $lang as xs:string, $return-url 
 };
 
 declare function ui:check-only($right as xs:string?, $owner as xs:string? := ()){
-  let $username := session:get('username'),
-      $token := session:get('token'),
-      $is-allowed := u:check($username, $token, $right) or ($owner eq session:get('username'))
+  let $username := ui:access-session('username'),
+      $token := ui:access-session('token'),
+      $is-allowed := u:check($username, $token, $right) or ($owner eq ui:access-session('username'))
   return $is-allowed
 };
 
@@ -135,8 +135,8 @@ declare
   %output:html-version('5')
 function ui:converter-runs($converter-id as xs:string, $lang as xs:string){
   let $runs := make:get-runs(),
-      $username := session:get('username'),
-      $token := session:get('token'),
+      $username := ui:access-session('username'),
+      $token := ui:access-session('token'),
       $title := i18n:val('conversions',$lang),
       $url := '/converter/' || $converter-id || '/runs',
       $return-url := '/converter/' || $converter-id,
@@ -219,7 +219,7 @@ function ui:converter-convert($converter-id as xs:string, $file as map(xs:string
   let $params := request:parameter-map(),
       $text-params := map:remove(request:parameter-map(),'upload_file_uploaded_data'),
       $converter as element(converter) := conv:get($converter-id),
-      $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file, session:get('username')) 
+      $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file, ui:access-session('username')) 
   return if ($run/error)
          then web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error)) 
          else web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/runs/'   || $run/id))
@@ -246,7 +246,7 @@ function ui:log($converter-id as xs:string, $runid as xs:string, $lang as xs:str
                           case 'stopped' return '✔️'
                           default return '-',
         $title as xs:string? := $run-info?filename,
-        $is-allowed as xs:boolean := make:allowed(session:get('username'),$run-info),
+        $is-allowed as xs:boolean := make:allowed(ui:access-session('username'),$run-info),
         $start as xs:dateTime := xs:dateTime($run-info?start),
         $end as xs:dateTime? := if (exists($run-info?end)) then xs:dateTime($run-info?end) else (),
         $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
@@ -506,9 +506,9 @@ function ui:do-login($lang as xs:string, $url as xs:string?, $username as xs:str
     if ($is-error) 
     then web:redirect('error?url=' || 'login&amp;message=' || i18n:val('login-failed',$lang))
     else (
-      session:set('token', $token/self::token/text()),
-      session:set('timestamp', current-dateTime()),
-      session:set('username', $username),
+      ui:access-session('token', $token/self::token/text()),
+      ui:access-session('timestamp', current-dateTime()),
+      ui:access-session('username', $username),
       if ($url) then web:redirect($url) else web:redirect('converter')
     )
 };
@@ -570,7 +570,7 @@ declare
 function ui:user-add-role($lang as xs:string, $username-to-update as xs:string, $role as xs:string, $return-url as xs:string?){
   let $right := 'u:mgmt',
       $can-do := ui:check-only($right, $lang),
-      $log := hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || session:get('username') || '(' || $can-do || ')','CHECK'),
+      $log := hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','CHECK'),
       $do-update := if ($can-do) then u:add-role($username-to-update, $role) else ()
   return web:redirect(config:url('/' || $lang || $return-url))
 };
@@ -592,13 +592,15 @@ declare
   %rest:POST
   %rest:path("/{$lang}/users/{$username-to-update}/password/reset")
   %rest:query-param("url","{$return-url}")
-  %rest:form-param("password","{$password}")
+  %rest:form-param("new-password","{$new-password}")
+  %rest:form-param("old-password","{$old-password}")
   %output:method("html")
   %output:html-version('5')
-function ui:user-reset-password($lang,$username-to-update,$password, $return-url){
+function ui:user-reset-password($lang, $username-to-update, $old-password, $new-password, $return-url){
   let $right := 'u:mgmt',
       $can-do := ui:check($right, $lang, $return-url, $username-to-update),
-      $do-update := if ($can-do) then u:set-password($username-to-update, $password) else ()
+      $old-pw-correct := u:validate-password(ui:access-session('username'),$old-password),
+      $do-update := if ($can-do and $old-pw-correct) then u:set-password($username-to-update, $new-password) else ()
   return web:redirect(config:url('/' || $lang ||$return-url))
 };
 
@@ -652,7 +654,7 @@ declare
   %output:html-version('5')
 function ui:user($lang, $username-to-update, $return-url){
   let $title := i18n:val('user-preferences',$lang),
-      $username := session:get('username'),
+      $username := ui:access-session('username'),
       $session-ids :=
         for $id in sessions:ids()
         where sessions:get($id,'username') eq $username-to-update
@@ -701,19 +703,44 @@ function ui:user($lang, $username-to-update, $return-url){
         element div {
           attribute class {'well'},
           element h3 {i18n:val('password',$lang)},
-          element form {
-            attribute method {'POST'},
-            attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url},
-            element div {
-            element input {
-              attribute class {'form-control'},
-              attribute type {'password'},
-              attribute name {'password'}
-            }},
-            element input {
-              attribute class {'form-control'},
-              attribute type {'submit'},
-              attribute value {i18n:val('submit',$lang)}
+          
+          element form-group {
+            attribute class {'form-group'},
+            element form {
+              attribute method {'POST'},
+              attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url},
+              attribute class {},
+              element form-group {
+                attribute class {'form-group'},
+                element label {
+                  attribute for {'old-password'},
+                  i18n:val('old-password',$lang)
+                },
+                element input {
+                  attribute class {'form-control line'},
+                  attribute type {'password'},
+                  attribute name {'old-password'}
+                }
+              },
+              element form-group {
+                attribute class {'form-group'},
+                element label {
+                  attribute for {'password'},
+                  i18n:val('new-password',$lang)
+                },
+                element input {
+                  attribute class {'form-control line'},
+                  attribute type {'password'},
+                  attribute name {'password'}
+                },
+                element form-group {
+                  element input {
+                    attribute class {'form-control line'},
+                    attribute type {'submit'},
+                    attribute value {i18n:val('submit',$lang)}
+                  }
+                }
+              }
             }
           }
         }
@@ -819,4 +846,14 @@ declare %private function ui:create-anchor($text as xs:string? := (), $href as x
 
 declare %private function ui:close-session($id) {
   sessions:close($id)
+};
+
+declare %private function ui:access-session($name) {
+  session:get($name),
+  session:set('accessed',current-dateTime())
+};
+
+declare %private function ui:access-session($name,$value) {
+  session:set($name,$value),
+  session:set('accessed',current-dateTime())
 };
