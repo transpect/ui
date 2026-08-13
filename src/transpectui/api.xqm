@@ -205,6 +205,19 @@ function api:get-new-token($lang as xs:string){
 
 declare
   %rest:GET
+  %rest:path("/api/{$lang}/token/valid")
+  %output:method("xml")
+function api:token-valid($lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $auth := api:auth($headers, true())
+  return
+    if (xs:boolean($auth/@allowed))
+    then element result {true()}
+    else element error {i18n:val('login-failed',$lang)}
+}; 
+
+declare
+  %rest:GET
   %rest:path("/api/{$lang}/token/clear")
   %output:method("xml")
 function api:clear-tokens($lang as xs:string){
@@ -336,6 +349,3 @@ declare %private function api:auth($headers as map(xs:string, xs:string*)?, $all
           }
     return $result
 };
-
-
-
