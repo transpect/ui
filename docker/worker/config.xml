@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurations>
+  <configuration>
+    <data-dir-base>/opt/data</data-dir-base>
+    <base-url></base-url>
+    <api>
+      <allow-basic-auth>false</allow-basic-auth>
+      <allow-bearer-auth>true</allow-bearer-auth>
+    </api>
+    <controller activated="false">
+    </controller>
+  </configuration>
+</configurations>

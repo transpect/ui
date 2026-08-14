@@ -6,7 +6,7 @@ declare function conv:get-all() as element(converter)*{
   $conv:converters
 };
 
-declare function conv:get($converter-id as xs:string) as element(converter){
+declare function conv:get($converter-id as xs:string) as element(converter)?{
   $conv:converters[@id eq $converter-id]
 };
 

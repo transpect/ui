@@ -9,6 +9,7 @@ import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
 
 declare variable $api:config := $config:file/configurations/configuration/api;
+declare variable $api:is-worker := not($config:file/configurations/configuration/controller/activated eq "true"); (: ALL Calls are allowed:)
 
 declare
   %rest:GET
@@ -90,8 +91,9 @@ declare
 function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
+      $converter := conv:get($converter-id),
       $username := $authed/username,
-      $runs := make:get-runs(),
+      $runs := make:get-runs($converter),
       $user := u:users($username),
       $allowed-runs := 
         for $runid in map:keys($runs)
@@ -99,29 +101,29 @@ function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
         return $runid,
       $running-runs :=
         for $runid in $allowed-runs
-        where xs:boolean($runs?$runid?status eq 'running')
+        where xs:boolean($runs?$runid/status eq 'running')
         return $runid,
       $finished-runs :=
         for $runid in $allowed-runs
-        where not(xs:boolean($runs?$runid?status = ('pending','running')))
+        where not(xs:boolean($runs?$runid/status = ('pending','running')))
         return $runid,
       $pending-runs :=
         for $runid in $allowed-runs
-        where xs:boolean($runs?$runid?status eq 'pending')
+        where xs:boolean($runs?$runid/status eq 'pending')
         return $runid,
       $result := (
         for $runid in $pending-runs
-        let $run as map(*) :=$runs?$runid
-        order by xs:dateTime($run?start) descending
-        return element run { attribute runid {$runid}, hf:map-to-xml($run)},
+        let $run as element(run) :=$runs?$runid
+        order by xs:dateTime($run/start) descending
+        return $run,
         for $runid in $running-runs
-        let $run as map(*) :=$runs?$runid
-        order by xs:dateTime($run?start) descending
-        return element run { attribute runid {$runid}, hf:map-to-xml($run)},
+        let $run as element(run) :=$runs?$runid
+        order by xs:dateTime($run/start) descending
+        return $run,
         for $runid in $finished-runs
-        let $run as map(*) :=$runs?$runid
-        order by xs:dateTime($run?start) descending
-        return element run { attribute runid {$runid}, hf:map-to-xml($run)}
+        let $run as element(run) :=$runs?$runid
+        order by xs:dateTime($run/start) descending
+        return $run
       )
   return 
     if (xs:boolean($authed/@allowed))
@@ -137,8 +139,8 @@ function api:get-converter-runs($converter-id as xs:string, $runid as xs:string 
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $run-info as map(*) := make:get-run($runid),
-      $out-path := $run-info?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $run as element(run) := make:get-run($runid),
+      $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $result-files :=
         for $file in file:list($out-path)
         where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
@@ -153,7 +155,7 @@ function api:get-converter-runs($converter-id as xs:string, $runid as xs:string 
           }
   return 
     if (xs:boolean($authed/@allowed))
-    then element run {attribute runid {$runid}, hf:map-to-xml($run-info), $result-download-urls}
+    then element run {attribute runid {$runid}, $run, $result-download-urls}
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -162,8 +164,8 @@ declare
   %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/download/{$filename}")
 function api:get-converter-runs-download($converter-id as xs:string, $runid as xs:string ,$lang as xs:string, $filename as xs:string){
 
-  let $run-info as map(*) := make:get-run($runid),
-      $out-path := $run-info?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+  let $run as element(run) := make:get-run($runid),
+      $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $filepath := $out-path || $filename,
       $filesize := file:size($filepath),
       $extention := ($filename => tokenize('[\./]'))[last()],
@@ -315,37 +317,44 @@ declare %private function api:converter($username as xs:string, $lang as xs:stri
 };
 
 declare %private function api:auth($headers as map(xs:string, xs:string*)?, $allowed-override as xs:boolean? := false()) as element(auth) {
-  if (not(exists($headers)) or not(exists($headers?Authorization)))
+  if ($api:is-worker)
   then
     element auth {
-      attribute allowed {false()},
-      element messages {'no-cred-message'}
+      attribute allowed {true()},
+      element username { $headers?username otherwise 'admin'}
     }
-  else
-    let $auth-header as xs:string+ := $headers?Authorization => tokenize(' '),
-        $auth := $auth-header[2],
-        
-        $result := 
-          element auth {
-            switch ($auth-header[1])
-              case 'Basic' return
-                let $auth-decoded := convert:binary-to-string(xs:base64Binary($auth)) => tokenize(':'),
-                    $allow-use := xs:boolean($api:config/allow-basic-auth/text()) or $allowed-override
-                return (
-                  attribute allowed {if ($allow-use) then u:validate-password($auth-decoded[1],$auth-decoded[2]) else false()},
-                  element username {$auth-decoded[1]},
-                  element messages {'basic-auth-disabled'}[not($allow-use)]
-                  )
-              case 'Bearer' return
-                let $token := $auth,
-                    $allow-use := xs:boolean($api:config/allow-bearer-auth/text()) or $allowed-override
-                return (
-                  attribute allowed {if (xs:boolean($api:config/allow-bearer-auth/text()) or $allowed-override) then u:validate-token($token) else false()},
-                  element username {u:username-for-token($token)},
-                  element messages {'bearer-auth-disabled'}[not($allow-use)],
-                  element messages {'token-invalid'}[$allow-use]
-                  )
-              default return attribute allowed {false()}
-          }
-    return $result
+  else 
+    if (not(exists($headers)) or not(exists($headers?Authorization)))
+    then
+      element auth {
+        attribute allowed {false()},
+        element messages {'no-cred-message'}
+      }
+    else
+      let $auth-header as xs:string+ := $headers?Authorization => tokenize(' '),
+          $auth := $auth-header[2],
+          
+          $result := 
+            element auth {
+              switch ($auth-header[1])
+                case 'Basic' return
+                  let $auth-decoded := convert:binary-to-string(xs:base64Binary($auth)) => tokenize(':'),
+                      $allow-use := xs:boolean($api:config/allow-basic-auth/text()) or $allowed-override
+                  return (
+                    attribute allowed {if ($allow-use) then u:validate-password($auth-decoded[1],$auth-decoded[2]) else false()},
+                    element username {$auth-decoded[1]},
+                    element messages {'basic-auth-disabled'}[not($allow-use)]
+                    )
+                case 'Bearer' return
+                  let $token := $auth,
+                      $allow-use := xs:boolean($api:config/allow-bearer-auth/text()) or $allowed-override
+                  return (
+                    attribute allowed {if (xs:boolean($api:config/allow-bearer-auth/text()) or $allowed-override) then u:validate-token($token) else false()},
+                    element username {u:username-for-token($token)},
+                    element messages {'bearer-auth-disabled'}[not($allow-use)],
+                    element messages {'token-invalid'}[$allow-use]
+                    )
+                default return attribute allowed {false()}
+            }
+      return $result
 };

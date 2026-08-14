@@ -1,11 +1,15 @@
 module namespace st = 'http://le-tex.de/store';
 
+import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
+
 declare variable $st:cache-key := 'st:cache';
 declare variable $st:cache-age-key := $st:cache-key || '_timestamp';
 declare variable $st:cache-max-age := xs:dayTimeDuration('PT1H0M0S');
 (: 
  : wrapper module for basex store access
  :)
+ 
+ (:TODO: everything in here is xml:)
 
 declare function st:set($prefix, $runid, $value){
   if (store:keys() = $st:cache-key)
@@ -51,7 +55,12 @@ declare function st:list($use-cache as xs:boolean? := true()) as xs:string* {
       return $runid
 };
 
-declare function st:get-run($runid as xs:string) as map(xs:string, item()*)?{
+declare function st:get-run($runid as xs:string) as element(run)?{
+  element run {
+      hf:map-to-xml(st:get-run-map($runid))
+  }
+};
+declare function st:get-run-map($runid as xs:string) as map(xs:string, item()*){
   map:build(
     file:list('/opt/data/runs/' || $runid),
     keys := fn { . },
@@ -65,7 +74,7 @@ declare function st:rebuild-cache(){
   store:put($st:cache-age-key,current-dateTime()),
   let $runs :=
         for $runid in st:list(false())
-        return st:get-run($runid),
+        return st:get-run-map($runid),
       $store := store:put($st:cache-key,$runs)
   return st:list(false())
 };

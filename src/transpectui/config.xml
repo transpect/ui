@@ -7,5 +7,10 @@
       <allow-basic-auth>false</allow-basic-auth>
       <allow-bearer-auth>true</allow-bearer-auth>
     </api>
+    <controller activated="true">
+      <worker id="gandalf">
+        <base-url>http://gandalf:8000</base-url>
+      </worker>
+    </controller>
   </configuration>
 </configurations>

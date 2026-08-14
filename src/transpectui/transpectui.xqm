@@ -5,6 +5,7 @@ import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-func
 import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
+import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
 
 declare function ui:check($right as xs:string?, $lang as xs:string, $return-url as xs:string?, $owner as xs:string? := ()){
   let $is-logged-in := exists(ui:access-session('username')),
@@ -34,31 +35,79 @@ function ui:converter-list($lang as xs:string){
   let $right := 'tr:list',
       $title := 'TranspectUI',
       $header := request:header-map(),
-      $converters as element(converter)* := conv:get-all(),
+      $converters as element(converter)* := (conv:get-all(),worker:converter()),
       $url := '/converter',
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url}
   return
     (
-      if (count($converters) eq 1)
-      then
-        web:redirect(config:url('/' || $lang || '/converter/' || $converters[1]/xs:string(@id)))
-      else (
-        ui:check($right, $lang, $url),
-        element html {
-          config:get-html-head($context),
-          element body {
-            config:get-html-header($context),
-            element div {
-              attribute class {'well'},
-              for $converter in $converters
-              let $allowed := ui:check-only($converter/@id || ':convert')
-              return
-                ui:create-anchor($converter/xs:string(@name), config:url('/' || $lang || '/converter/' || $converter/xs:string(@id)), 'block', $allowed)
-            }
+      ui:check($right, $lang, $url),
+      element html {
+        ui:get-html-head($context),
+        element body {
+          ui:get-html-header($context),
+          element div {
+            attribute class {'well'},
+            for $converter in ($converters)
+            let $allowed := ui:check-only($converter/@worker || $converter/@id || ':convert')
+            return
+              if (exists($converter/@worker))
+              then ui:create-anchor($converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url(string-join(('', $lang, 'worker', $converter/@worker, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
+              else ui:create-anchor($converter/xs:string(@name), config:url(string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
           }
         }
-      )
+      }
     )
+};
+
+declare
+  %rest:GET
+  %rest:path("/{$lang}/worker")
+  %output:method("html")
+  %output:html-version('5')
+function ui:worker-list($lang as xs:string){
+  let $right := 'worker:list',
+      $title := 'Worker',
+      $header := request:header-map(),
+      $workers as element(worker)* := ($worker:worker),
+      $url := '/worker',
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url}
+  return
+    (
+      ui:check($right, $lang, $url),
+      element html {
+        ui:get-html-head($context),
+        element body {
+          ui:get-html-header($context),
+          element div {
+            attribute class {'well'},
+            for $worker in $workers
+            let $converter := worker:converter($worker),
+                $allowed := ui:check-only(xs:string($converter/@worker) || xs:string($converter/@id) || ':convert')
+            return
+              element details {
+                attribute open {true()},
+                element summary {xs:string($worker/@id)},
+                for $c in $converter
+                return ui:create-anchor($converter/xs:string(@name) || (' (' || $converter/@id || ')'), config:url(string-join(('', $lang, 'worker', $converter/@worker, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
+              }
+          }
+        }
+      }
+    )
+};
+
+declare
+  %rest:GET
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}")
+  %output:method("html")
+  %output:html-version('5')
+function ui:converter-page($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
+  let $converter := worker:converter(worker:get-by-id($worker-id),$converter-id),
+      $url := string-join(('','worker', $worker-id, 'converter', $converter-id),'/'),
+      $right := $worker-id || $converter-id || ':convert',
+      $title := $converter/xs:string(@name) || ' (' || $worker-id ||  ')',
+      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url}
+  return if (exists($converter)) then ui:build-converter-page($converter, $context) else web:redirect(config:url('/' || $lang || '/converter'))
 };
 
 declare
@@ -67,65 +116,12 @@ declare
   %output:method("html")
   %output:html-version('5')
 function ui:converter-page($converter-id as xs:string, $lang as xs:string){
-  let $converter := conv:get($converter-id),
-      $title := $converter/xs:string(@name),
-      $parameters := $converter/inputs/*,
+  let $converter as element(converter)? := conv:get($converter-id),
       $url := '/converter/' || $converter-id,
-      $context := map {'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url},
-      $right := $converter-id || ':convert'
-  return
-    (
-      ui:check($right, $lang, $url),
-      element html {
-        config:get-html-head($context),
-        element body {
-          config:get-html-header($context),
-          element div {
-            attribute class {'well'},
-            hf:create-anchor(config:url('/' || $lang || '/converter/' || $converter-id || '/runs'),i18n:val('prev-conversions',$lang))
-          },
-          element div {
-            attribute class {'well'},
-            element form {
-              attribute action {config:url('/' || $lang || '/converter/' || $converter-id || '/convert')},
-              attribute method {'POST'},
-              attribute enctype {"multipart/form-data"},
-              for $p in $parameters
-              return hf:parameter-to-html($p, $lang),
-              element form-group{
-                element label {
-                  i18n:val("upload",$lang)
-                },
-                element input {
-                  attribute type {'text'},
-                  attribute required {''},
-                  attribute readonly {''},
-                  attribute name {'file-name'},
-                  attribute id {'file-name'},
-                  attribute class {'form-control invalid'},
-                  attribute onclick {"document.querySelector('#upload_file_uploaded_data').click();document.querySelector('#submit-to-conversion').classList.remove('disabled');"},
-                  attribute placeholder {i18n:val("select-file",$lang)},
-                  attribute autocomplete {'off'}
-                },
-                element input {
-                  attribute type {'file'},
-                  attribute id {'upload_file_uploaded_data'},
-                  attribute name {'upload_file_uploaded_data'},
-                  attribute class {'hidden'}
-                },
-                element button {
-                  attribute id {'submit-to-conversion'},
-                  attribute disabled {},
-                  attribute class {'primary-btn disabled'},
-                  attribute type {'submit'},
-                  i18n:val("submit-file",$lang)
-                }
-              }
-            }
-          }
-        }
-      }
-    )
+      $right := $converter-id || ':convert',
+      $title := $converter/xs:string(@name),
+      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url}
+  return if (exists($converter)) then ui:build-converter-page($converter, $context) else web:redirect(config:url('/' || $lang || '/converter'))
 };
 
 declare
@@ -133,80 +129,33 @@ declare
   %rest:path("/{$lang}/converter/{$converter-id}/runs")
   %output:method("html")
   %output:html-version('5')
-function ui:converter-runs($converter-id as xs:string, $lang as xs:string){
-  let $runs := make:get-runs(),
+function ui:get-converter-runs($converter-id as xs:string, $lang as xs:string){
+  let $runs := make:get-runs($converter-id),
       $username := ui:access-session('username'),
-      $token := ui:access-session('token'),
+      $converter as element(converter) := conv:get($converter-id),
       $title := i18n:val('conversions',$lang),
       $url := '/converter/' || $converter-id || '/runs',
       $return-url := '/converter/' || $converter-id,
       $right := $converter-id || ':conversions',
-      $context := map {'title': $title, 'lang': $lang, 'return-url':$return-url, 'url':'/converter/'|| $converter-id || '/runs'},
-      $allowed-runs := 
-        for $runid in map:keys($runs)
-        where make:allowed($username,$runs?$runid)
-        return $runid,
-      $running-runs :=
-        for $runid in $allowed-runs
-        where xs:boolean($runs?$runid?status eq 'running')
-        return $runid,
-      $finished-runs :=
-        for $runid in $allowed-runs
-        where not(xs:boolean($runs?$runid?status = ('pending','running')))
-        return $runid,
-      $pending-runs :=
-        for $runid in $allowed-runs
-        where xs:boolean($runs?$runid?status eq 'pending')
-        return $runid
-  return(
-    ui:check($right, $lang, $return-url),
-    element html {
-      config:get-html-head($context),
-      element body {
-        config:get-html-header($context),
-        element div {
-          attribute class {'well'},
-          element div {
-            attribute class {'date spacious'},
-            i18n:val('called',$lang) || ': ' || hf:format-dateTime(current-dateTime())
-          },
-          element div {
-            attribute class {'well'},
-            i18n:val('pending-conversions',$lang) || ':',
-            if (count($pending-runs) eq 0)
-            then make:empty-run-info('empty-pending',$lang)
-            else
-              for $runid in $pending-runs
-              let $run as map(*) :=$runs?$runid
-              order by xs:dateTime($run?start) descending
-              return make:run-info-display($runid, $run, $lang, $converter-id, $context)
-          },
-          element div {
-            attribute class {'well'},
-            i18n:val('running-conversions',$lang) || ':',
-            if (count($running-runs) eq 0)
-            then make:empty-run-info('empty-running',$lang)
-            else
-              for $runid in $running-runs
-              let $run as map(*) :=$runs?$runid
-              order by xs:dateTime($run?start) descending
-              return make:run-info-display($runid, $run, $lang, $converter-id, $context)
-          },
-          element div {
-            attribute class {'well'},
-            i18n:val('finished-conversions',$lang) || ':',
-            if (count($finished-runs) eq 0)
-            then make:empty-run-info('empty-finished',$lang)
-            else
-              for $runid in $finished-runs
-              let $run as map(*) :=$runs?$runid
-              order by xs:dateTime($run?start) descending
-              return make:run-info-display($runid, $run, $lang, $converter-id, $context)
-          }
-        }
-      }
-    }
-  )
+      $context := map {'title': $title, 'lang': $lang, 'return-url':$return-url, 'url':'/converter/'|| $converter-id || '/runs', 'right':$right, 'username': $username}
+  return ui:build-runs-page($converter, $context)
+};
+
+declare
+  %rest:GET
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs")
+  %output:method("html")
+  %output:html-version('5')
+function ui:get-worker-converter-runs($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
+  let $worker as element(worker)? := worker:get-by-id($worker-id),
+      $converter as element(converter) := worker:converter($worker,$converter-id),
+      $username := ui:access-session('username'),
+      $title := i18n:val('conversions',$lang),
+      $url := '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs',
+      $return-url := '/converter/' || $converter-id,
+      $right := $worker-id || $converter-id || ':conversions',
+      $context := map {'title': $title, 'lang': $lang, 'return-url':$return-url, 'url':$url, 'right':$right, 'username': $username}
+  return ui:build-runs-page($converter, $context)
 };
 
 declare
@@ -226,130 +175,57 @@ function ui:converter-convert($converter-id as xs:string, $file as map(xs:string
 };
 
 declare
+  %rest:POST
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/convert")
+  %rest:form-param('upload_file_uploaded_data', '{ $file }')
+  %output:method("html")
+  %output:html-version('5')
+function ui:worker-converter-convert($worker-id as xs:string, $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $lang as xs:string){
+  let $params := request:parameter-map(),
+      $text-params := map:remove(request:parameter-map(),'upload_file_uploaded_data'),
+      $worker := worker:get-by-id($worker-id),
+      $converter as element(converter) := worker:converter(worker:get-by-id($worker-id),$converter-id),
+      $run as element(run) := worker:convert($worker, $converter-id, $file, session:get('username'))
+  return if ($run/error)
+         then web:redirect(config:url('/' || $lang || '/worker/' || $worker-id || '/converter/' || $converter-id || '/error/' || $run/error)) 
+         else web:redirect(config:url('/' || $lang || '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs/'  || $run/id))
+};
+
+declare
   %rest:GET
   %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}")
   %output:method("html")
   %output:html-version('5')
-function ui:log($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
+function ui:run-info($converter-id as xs:string, $runid as xs:string, $lang as xs:string){
   let $url := '/converter/' || $converter-id || '/runs/' || $runid
   return (
     ui:check('', $lang, $url),
     let $converter as element(converter) := conv:get($converter-id),
-        $run-info as map(*) := make:get-run($runid),
-        $status as xs:string := $run-info?status,
-        $is-running as xs:boolean := $status eq 'running' or $status eq 'pending',
-        $parameters as xs:string* := $run-info?params,
-        $logs as xs:string* := make:get-logs($runid),
-        $short-status := switch ($status)
-                          case 'running' return '▶️'
-                          case 'pending' return '⏳'
-                          case 'stopped' return '✔️'
-                          default return '-',
-        $title as xs:string? := $run-info?filename,
-        $is-allowed as xs:boolean := make:allowed(ui:access-session('username'),$run-info),
-        $start as xs:dateTime := xs:dateTime($run-info?start),
-        $end as xs:dateTime? := if (exists($run-info?end)) then xs:dateTime($run-info?end) else (),
-        $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run-info?start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
-        $refresh := if ($is-running) then 5 else  (),
-        $url := '/converter/' || $converter-id || '/runs/' || $runid,
-        $context := map {'lang': $lang, 'title': $title, 'status': $short-status || ' ', 'refresh': $refresh, 'return-url': '/converter/' || $converter-id, 'url': $url , 'subtitle':$subtitle},
-        $log-dir := (($run-info?file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
-        $logs := make:get-file-logs($run-info?file),
-        $job-results := make:store-job-messages($runid),
-        $post-conv-actions := conv:get-post-conv-actions($converter),
-        $out-path := $run-info?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-        $result-files :=
-          for $file in file:list($out-path)
-          where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
-          return {'name': normalize-space($file), 'path': $out-path || normalize-space($file)}
-    return (
-      element html {
-        config:get-html-head($context),
-        element body {
-          config:get-html-header($context),
-          element div {
-            element div {
-              attribute class {'well'},
-              element h3 {i18n:val($status,$lang)},
-              hf:create-anchor(config:url('/' ||$lang || '/converter/' || $converter-id || '/runs/' || $runid || '/cancel' || '?url=/' || $lang || $url), i18n:val("cancel",$lang))[not($run-info?status = ('stopped','canceled'))]
-            },
-            element details {
-              attribute class {'make-parameters well'},
-              element summary {'Parameters'},
-              element ul {
-                for $p in $parameters
-                return
-                  element li {
-                    $p
-                  }
-              }
-            },
-            element details {
-              attribute class {'make-logs well'},
-              if ($status eq 'running') then attribute open {} else (),
-              element summary {i18n:val('logs',$lang)},
-              for $log at $index in $logs
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {attribute class {'time'}, hf:format-dateTime($log?time)},
-                element span {$log?text}
-              }
-            },
-          element details {
-            attribute class {'well'},
-            if ($status eq 'stopped') then attribute open {} else (),
-            element summary {i18n:val('results',$lang)},
-            for $file in $result-files
-            let $extention := ($file?name => tokenize('[\./]'))[last()],
-                $show-direct as xs:boolean := $extention = ('xhtml','html')
-            return element div {
-              attribute class {'line d-flex'},
-              element div {
-                attribute class {'filename'},
-                if ($show-direct)
-                then
-                  element a {
-                    attribute href {config:url('/' || $lang || '/converter/' || $converter-id || '/runs/' ||$runid || '/show/' || $file?name)},
-                    attribute target {'_blank'},
-                    $file?name}
-                else
-                  element a {
-                    attribute href {config:url('/runs/' ||$runid || '/download/' || $file?name)},
-                    attribute target {'_blank'},
-                    attribute download {$file?name},
-                    $file?name}},
-              element div {
-                attribute class {'actions'},
-                for $action in $post-conv-actions
-                where matches($file?name, $action/xs:string(@regex))
-                return
-                  element input{
-                    attribute type {'button'},
-                    attribute value {$action/xs:string(@message)},
-                    attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
-                  }
-              }
-            }
-          },
-          element details {
-            attribute class {'well'},
-            element summary {i18n:val('run',$lang)},
-            element div {
-              attribute class {'overflow'},
-              for $m  at $index in $job-results
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {$m}
-              }
-            }
-          }
-          }
-        }
-      }
+        $run as map(*) := make:get-run($runid),
+        $title as xs:string? := $run?filename,
+        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url}
+        
+    return ui:build-run-page($converter, $run, $context)
     )
-  )
+};
+
+declare
+  %rest:GET
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}")
+  %output:method("html")
+  %output:html-version('5')
+function ui:worker-run-info($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string, $lang as xs:string){
+  let $url := string-join(('','worker', $worker-id, 'converter', $converter-id, 'runs', $runid),'/')
+  return (
+    ui:check('', $lang, $url),
+    let $worker := worker:get-by-id($worker-id), 
+        $converter as element(converter) := worker:converter($worker,$converter-id),
+        $run as element(run)? := worker:get-run($converter,$runid),
+        $title as xs:string? := $run/filename,
+        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url}
+        
+    return ui:build-run-page($converter, $run, $context)
+    )
 };
 
 declare
@@ -427,9 +303,9 @@ function ui:error($error-message, $converter-id, $lang) {
       $context := map {'title': $title, 'lang': $lang, 'url':'/converter/' || $converter-id || '/error/' || $error-message, 'return-url':'/converter/' || $converter-id}
   return
     element html {
-        config:get-html-head($context),
+        ui:get-html-head($context),
         element body {
-          config:get-html-header($context),
+          ui:get-html-header($context),
           element div {
             attribute class {'error well'},
             $error-message
@@ -451,9 +327,9 @@ function ui:login-frontend($lang as xs:string, $return-url as xs:string?, $messa
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': ($return-url, $url)[1]}
   return
     element html {
-      config:get-html-head($context),
+      ui:get-html-head($context),
       element body {
-        config:get-html-header($context),
+        ui:get-html-header($context),
         element div {
               attribute class {'well'},
               element div {
@@ -544,9 +420,9 @@ function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $messa
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': $return-url}
   return
     element html {
-      config:get-html-head($context),
+      ui:get-html-head($context),
       element body {
-        config:get-html-header($context),
+        ui:get-html-header($context),
         element div {
           attribute class {'well'},
           element div {
@@ -666,9 +542,9 @@ function ui:user($lang, $username-to-update, $return-url){
   return (
     ui:check($right, $lang, $url, $username-to-update),
     element html {
-      config:get-html-head($context),
+      ui:get-html-head($context),
       element body {
-        config:get-html-header($context),
+        ui:get-html-header($context),
         element div {
           attribute class {'well'},
           element h3 {i18n:val('sessions',$lang)},
@@ -762,9 +638,9 @@ function ui:user-management($lang){
   return
     (ui:check($right, $lang, $url),
     element html {
-      config:get-html-head($context),
+      ui:get-html-head($context),
       element body {
-        config:get-html-header($context),
+        ui:get-html-header($context),
         element div {
           attribute class {'well'},
           element h3 {i18n:val('user-preferences',$lang)},
@@ -857,3 +733,328 @@ declare %private function ui:access-session($name,$value) {
   session:set($name,$value),
   session:set('accessed',current-dateTime())
 };
+
+declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
+  let $runs := make:get-runs($converter),
+      $allowed-runs := 
+        for $runid in map:keys($runs)
+        where make:allowed($context?username,$runs?$runid)
+        return $runid,
+      $running-runs :=
+        for $runid in $allowed-runs
+        where xs:boolean($runs?$runid/status/text() eq 'running')
+        return $runid,
+      $finished-runs :=
+        for $runid in $allowed-runs
+        where not(xs:boolean($runs?$runid/status/text() = ('pending','running')))
+        return $runid,
+      $pending-runs :=
+        for $runid in $allowed-runs
+        where xs:boolean($runs?$runid/status/text() eq 'pending')
+        return $runid
+  return(
+    ui:check($context?right, $context?lang, $context?return-url),
+    element html {
+      ui:get-html-head($context),
+      element body {
+        ui:get-html-header($context),
+        element div {
+          attribute class {'well'},
+          element div {
+            attribute class {'date spacious'},
+            i18n:val('called',$context?lang) || ': ' || hf:format-dateTime(current-dateTime())
+          },
+          element div {
+            attribute class {'well'},
+            i18n:val('pending-conversions',$context?lang) || ':',
+            if (count($pending-runs) eq 0)
+            then make:empty-run-info('empty-pending',$context?lang)
+            else
+              for $runid in $pending-runs
+              let $run as map(*) :=$runs?$runid
+              order by xs:dateTime($run?start) descending
+              return make:run-info-display($run, $converter, $context)
+          },
+          element div {
+            attribute class {'well'},
+            i18n:val('running-conversions',$context?lang) || ':',
+            if (count($running-runs) eq 0)
+            then make:empty-run-info('empty-running',$context?lang)
+            else
+              for $runid in $running-runs
+              let $run as map(*) :=$runs?$runid
+              order by xs:dateTime($run?start) descending
+              return make:run-info-display($run, $converter, $context)
+          },
+          element div {
+            attribute class {'well'},
+            i18n:val('finished-conversions',$context?lang) || ':',
+            if (count($finished-runs) eq 0)
+            then make:empty-run-info('empty-finished',$context?lang)
+            else
+              for $runid in $finished-runs
+              let $run as element(run) :=$runs?$runid
+              order by xs:dateTime($run/start/text()) descending
+              return make:run-info-display($run, $converter, $context)
+          }
+        }
+      }
+    }
+  )
+};
+
+declare function ui:build-run-page($converter as element(converter), $run as element(run), $context as map(xs:string,item()*)){
+  ( ui:check('', $context?lang, $context?url),
+    let $status as xs:string := $run/status,
+        $is-running as xs:boolean := $status eq 'running' or $status eq 'pending',
+        $parameters as xs:string* := $run/params/line,
+        $runid as xs:string := $run/runid,
+        $logs as xs:string* := make:get-logs($runid),
+        $short-status := switch ($status)
+                          case 'running' return '▶️'
+                          case 'pending' return '⏳'
+                          case 'stopped' return '✔️'
+                          default return '-',
+        $title as xs:string? := $run/filename,
+        $is-allowed as xs:boolean := make:allowed(ui:access-session('username'),$run),
+        $start as xs:dateTime := xs:dateTime($run/start),
+        $end as xs:dateTime? := if (exists($run/end)) then xs:dateTime($run/end) else (),
+        $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run/start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
+        $refresh := if ($is-running) then 5 else  (),
+        $url := '/converter/' || $converter/@id || '/runs/' || $runid,
+        $context := map:merge(($context, map {'status': $short-status || ' ', 'refresh': $refresh, 'subtitle':$subtitle})),
+        $log-dir := (($run/file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
+        $logs := make:get-file-logs($run/file),
+        $job-results := make:store-job-messages($runid),
+        $post-conv-actions := conv:get-post-conv-actions($converter),
+        $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+        $result-files :=
+          if ($converter/@worker)
+          then ()
+          else
+            for $file in file:list($out-path)
+            where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
+            return {'name': normalize-space($file), 'path': $out-path || normalize-space($file)}
+    return (
+      element html {
+        ui:get-html-head($context),
+        element body {
+          ui:get-html-header($context),
+          element div {
+            element div {
+              attribute class {'well'},
+              element h3 {i18n:val($status,$context?lang)},
+              hf:create-anchor(config:url('/' ||$context?lang || '/converter/' || $converter/@id || '/runs/' || $runid || '/cancel' || '?url=/' || $context?lang || $url), i18n:val("cancel",$context?lang))[not($run/status = ('stopped','canceled'))]
+            },
+            element details {
+              attribute class {'make-parameters well'},
+              element summary {'Parameters'},
+              element ul {
+                for $p in $parameters
+                return
+                  element li {
+                    $p
+                  }
+              }
+            },
+            element details {
+              attribute class {'make-logs well'},
+              if ($status eq 'running') then attribute open {} else (),
+              element summary {i18n:val('logs',$context?lang)},
+              for $log at $index in $logs
+              return element div {
+                attribute class {'log-entry'},
+                element span {attribute class {'index'}, $index},
+                element span {attribute class {'time'}, hf:format-dateTime($log?time)},
+                element span {$log?text}
+              }
+            },
+          element details {
+            attribute class {'well'},
+            if ($status eq 'stopped') then attribute open {} else (),
+            element summary {i18n:val('results',$context?lang)},
+            for $file in $result-files
+            let $extention := ($file?name => tokenize('[\./]'))[last()],
+                $show-direct as xs:boolean := $extention = ('xhtml','html')
+            return element div {
+              attribute class {'line d-flex'},
+              element div {
+                attribute class {'filename'},
+                if ($show-direct)
+                then
+                  element a {
+                    attribute href {config:url('/' || $context?lang || '/converter/' || $converter/@id || '/runs/' || $runid || '/show/' || $file?name)},
+                    attribute target {'_blank'},
+                    $file?name}
+                else
+                  element a {
+                    attribute href {config:url('/runs/' ||$runid || '/download/' || $file?name)},
+                    attribute target {'_blank'},
+                    attribute download {$file?name},
+                    $file?name}},
+              element div {
+                attribute class {'actions'},
+                for $action in $post-conv-actions
+                where matches($file?name, $action/xs:string(@regex))
+                return
+                  element input{
+                    attribute type {'button'},
+                    attribute value {$action/xs:string(@message)},
+                    attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
+                  }
+              }
+            }
+          },
+          element details {
+            attribute class {'well'},
+            element summary {i18n:val('run',$context?lang)},
+            element div {
+              attribute class {'overflow'},
+              for $m  at $index in $job-results
+              return element div {
+                attribute class {'log-entry'},
+                element span {attribute class {'index'}, $index},
+                element span {$m}
+              }
+            }
+          }
+          }
+        }
+      }
+    )
+  )
+};
+
+declare function ui:build-converter-page($converter as element(converter), $context as map(xs:string, item()*)) {
+  (
+    ui:check($context?right, $context?lang, $context?url),
+    element html {
+      ui:get-html-head($context),
+      element body {
+        ui:get-html-header($context),
+        element div {
+          attribute class {'well'},
+          hf:create-anchor(config:url('/' || $context?lang || $context?url || '/runs'),i18n:val('prev-conversions',$context?lang))
+        },
+        element div {
+          attribute class {'well'},
+          element form {
+            attribute action {config:url('/' || $context?lang || $context?url || '/convert')},
+            attribute method {'POST'},
+            attribute enctype {"multipart/form-data"},
+            for $p in $converter/inputs/*
+            return hf:parameter-to-html($p, $context?lang),
+            element form-group{
+              element label {
+                i18n:val("upload",$context?lang)
+              },
+              element input {
+                attribute type {'text'},
+                attribute required {''},
+                attribute readonly {''},
+                attribute name {'file-name'},
+                attribute id {'file-name'},
+                attribute class {'form-control invalid'},
+                attribute onclick {"document.querySelector('#upload_file_uploaded_data').click();document.querySelector('#submit-to-conversion').classList.remove('disabled');"},
+                attribute placeholder {i18n:val("select-file",$context?lang)},
+                attribute autocomplete {'off'}
+              },
+              element input {
+                attribute type {'file'},
+                attribute id {'upload_file_uploaded_data'},
+                attribute name {'upload_file_uploaded_data'},
+                attribute class {'hidden'}
+              },
+              element button {
+                attribute id {'submit-to-conversion'},
+                attribute disabled {},
+                attribute class {'primary-btn disabled'},
+                attribute type {'submit'},
+                i18n:val("submit-file",$context?lang)
+              }
+            }
+          }
+        }
+      }
+    }
+  )
+};
+
+
+declare %private function ui:get-html-head($context) {
+  element head {
+    element meta{
+      attribute http-equiv {'refresh'},
+      attribute content {$context?refresh}
+    }[$context?refresh gt 0],
+    element title {
+      $context?status || $context?title
+    },
+    element link {
+      attribute rel {"stylesheet"},
+      attribute type {"text/css"},
+      attribute href {config:url("/static/transpectui.css")}
+    },
+    element link{
+      attribute rel {"icon"},
+      attribute type {"image/x-icon"},
+      attribute href {config:url("/static/favicon-96x96.png")}
+    },
+    element script {
+      attribute src {config:url("/static/transpectui.js")}
+    }
+  }
+}; 
+
+declare %private function ui:get-html-header($context as map(xs:string, item()?)) {
+  element header {
+    attribute class {'d-flex column'},
+    element div {
+    attribute class {'d-flex'},
+      element a {
+        attribute href {config:url('/' || $context?lang || '/converter')},
+        element img {
+          attribute class {"header"},
+          attribute src {config:url("/static/transpect.png")}
+        }
+      },
+      element div {
+        attribute class {'d-flex center'},
+        element h1 {$context?title},
+        if ($context?subtitle) then element span {attribute class {'date'}, '(' || $context?subtitle || ')'}
+      },
+      element div {
+      attribute class {'d-flex center'},
+        element ul {
+          for $language in $i18n:languages//language
+          return (
+            element a {
+              attribute href {config:url("/" || $language/xs:string(@short) || $context?url)},
+              element img {
+                attribute class {'lang-img'},
+                attribute src {config:url('/static/' || $language/xs:string(@short) ||'.png')}
+              }
+            }
+          )
+        },
+        if (session:get('username'))
+        then 
+          element div {
+            attribute class {'d-flex column'},
+            attribute style {'margin-top: -5px;'},
+            hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?url=' || config:url($context?url)),session:get('username'),'lang-img'),
+            hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
+          }
+        else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
+      }
+    },
+    element div {
+      attribute class {'breadcrumbs'},
+      let $parts := $context?url => tokenize('/')
+      return 
+        for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
+        let $href := string-join($parts[position() le $i + 1],'/')
+        return element span {ui:create-anchor($part, config:url(('/' || $context?lang, $href)),())}
+    }
+  }
+}; 
