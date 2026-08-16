@@ -2,6 +2,7 @@ module namespace queue = 'http://le-tex.de/queue';
 
 import module namespace ns = 'http://le-tex.de/namespaces' at 'namespaces.xqm';
 import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
 (: 
  : queue for simultaniously running calls.
  :)
@@ -11,18 +12,19 @@ declare variable $queue:running-key := "running-queue";
 declare variable $queue:max := 3;
 declare variable $queue:max-age := 0;
 
-declare function queue:register($job-query as xs:string, $job-parameter as map(*)? := {}, $job-options as map(*)? := {}, $callback := ()) {
+declare function queue:register($job-query as xs:string, $job-parameter as map(*)? := {}, $job-options as map(*)? := {}, $start-callback := (), $end-callback := ()) {
   let $job-map := map {
         'query': $job-query,
         'parameter': $job-parameter,
         'options': $job-options,
-        'callback': $callback,
         'id':random:uuid()
       },
-      $add-to-queue := queue:add($job-map),
-      $log := queue:log('Register job ' || $job-map?id),
+      $insert-start-callback := if ($start-callback) then map:put($job-map,'start-callback',$start-callback) else $job-map,
+      $insert-end-callback := if ($end-callback) then map:put($insert-start-callback,'end-callback',$end-callback) else $insert-start-callback,
+      $add-to-queue := queue:add($insert-end-callback),
+      $log := queue:log('Register job ' || $insert-end-callback?id),
       $run := queue:run()
-  return $job-map
+  return $insert-end-callback
 };
 
 declare function queue:is-pending($id) {
@@ -79,11 +81,15 @@ declare %private function queue:log($text) {
 };
 
 declare %private function queue:start-job($job as map(*)) {
-  let $job-id := job:eval($job?query, $job?parameter, $job?options),
+  let $job-id :=($job?id,substring(random:uuid(),1,8))[1],
+      $store := store:put('job',$job),
+      $compose-query := $job?query || hf:static-replace-variables(", job:eval($callback, {'job-id': $job-id},{'id':$id})",map {'callback':$job?end-callback, 'job-id':$job-id,'id':'end-callback of ' || $job-id},'"')[$job?end-callback],
+      $log := queue:log($compose-query),
+      $start := job:eval($compose-query, $job?parameter, map:put($job?options,'id',$job-id)),
       $log := queue:log('Start Job ' || $job?id || ' as ' || $job-id),
       $add-to-running := queue:add-to-running($job-id),
-      $run-callback := job:eval($job?callback, map{'job-id': $job-id}, map {'id': 'callback to ' || $job-id})
-  return $job-id
+      $run-callback := job:eval($job?start-callback, map{'job-id': $job-id}, map {'id': 'start-callback of ' || $job-id})
+  return $start
 };
 
 declare %private function queue:queue-check() {

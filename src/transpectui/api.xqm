@@ -68,14 +68,13 @@ declare
   %rest:path("/api/{$lang}/converter/{$converter-id}")
   %rest:form-param('file', '{$file}')
   %output:method("xml")
-function api:upload-file($file as map(xs:string, xs:base64Binary), $converter-id as xs:string, $lang as xs:string){
+function api:convert($file as map(xs:string, xs:base64Binary), $converter-id as xs:string, $lang as xs:string){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $text-params := map:remove(request:parameter-map(),('upload_file_uploaded_data','file')),
-      $user := u:users($username),
+      $text-params := map:remove(request:parameter-map(),('file','file')),
       $right := $converter-id || ':convert',
-      $is-allowed := (u:can-do($user, $right) and xs:boolean($authed/@allowed)),
+      $is-allowed := (api:can-do($right, $username) and xs:boolean($authed/@allowed)),
       $converter := conv:get($converter-id),
       $run as (element(error)|element(run)) :=
         if ($is-allowed)
@@ -156,6 +155,39 @@ function api:get-converter-runs($converter-id as xs:string, $runid as xs:string 
   return 
     if (xs:boolean($authed/@allowed))
     then element run {attribute runid {$runid}, $run, $result-download-urls}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/logs")
+  %output:method("xml")
+function api:get-converter-run-file-logs($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $run as element(run) := make:get-run($runid),
+      $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $file-logs := make:get-file-logs($run/file)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element file-log {$file-logs}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/cancel")
+  %output:method("xml")
+function api:get-converter-stop-run($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $stop := make:stop-run($runid)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element result{$stop}
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -243,9 +275,8 @@ function api:user-new($lang,$username-to-create,$password){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username as xs:string := $authed/username,
-      $user := u:users($username),
       $right := 'u:mgmt',
-      $can-do := u:can-do($user, $right),
+      $can-do := api:can-do($right, $username),
       $do-update := if ($can-do) then u:new-user($username-to-create, $password) else (),
       $log := if ($can-do) then hf:log('create new user: ' ||$username-to-create)
   return $do-update
@@ -262,7 +293,7 @@ function api:user-get($lang){
       $username as xs:string := $authed/username,
       $user := u:users($username),
       $right := 'u:mgmt',
-      $can-do := u:can-do($user, $right),
+      $can-do := api:can-do($right, $username),
       $get := if ($can-do) then u:users()
   return $get
 };
@@ -278,7 +309,7 @@ function api:user-get($lang,$username-to-get){
       $username as xs:string := $authed/username,
       $user := u:users($username),
       $right := 'u:mgmt',
-      $can-do := u:can-do($user, $right, $username-to-get),
+      $can-do := api:can-do($right, $username, $username-to-get),
       $get := if ($can-do) then u:users($username-to-get)
   return $get
 };
@@ -292,17 +323,16 @@ function api:user-new($lang,$username-to-delete){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username as xs:string := $authed/username,
-      $user := u:users($username),
       $right := 'u:mgmt',
-      $can-do := u:can-do($user, $right, $username-to-delete),
+      $can-do := api:can-do($right, $username, $username-to-delete),
       $do-update := if ($can-do) then u:delete-user($username-to-delete) else (),
       $log := if ($can-do) then hf:log('delete user: ' ||$username-to-delete)
   return $do-update
 };
 
 declare %private function api:converter($converter-id as xs:string, $username as xs:string, $lang as xs:string) {
-  let $user := u:users($username),
-      $converter := if (u:can-do($user, $converter-id || ':convert')) then conv:get($converter-id) else element error {i18n:val('not-allowed-message', $lang)}
+  let $right :=  $converter-id || ':convert',
+      $converter := if (api:can-do($right, $username)) then conv:get($converter-id) else element error {i18n:val('not-allowed-message', $lang)}
   return $converter
 };
 
@@ -311,7 +341,7 @@ declare %private function api:converter($username as xs:string, $lang as xs:stri
       $user := u:users($username),
       $filtered :=
         for $conv in $converter
-        where u:can-do($user, $conv/@id || ':convert') 
+        where api:can-do($conv/@id || ':convert', $username) 
         return $conv
   return $converter
 };
@@ -319,10 +349,13 @@ declare %private function api:converter($username as xs:string, $lang as xs:stri
 declare %private function api:auth($headers as map(xs:string, xs:string*)?, $allowed-override as xs:boolean? := false()) as element(auth) {
   if ($api:is-worker)
   then
-    element auth {
-      attribute allowed {true()},
-      element username { $headers?username otherwise 'admin'}
-    }
+    let $username := $headers?username otherwise 'not-found',
+        $log := for $k in map:keys($headers) return hf:log($k || ':' || $headers?$k,'H')
+    return
+      element auth {
+        attribute allowed {true()},
+        element username { $username }
+      }
   else 
     if (not(exists($headers)) or not(exists($headers?Authorization)))
     then
@@ -357,4 +390,9 @@ declare %private function api:auth($headers as map(xs:string, xs:string*)?, $all
                 default return attribute allowed {false()}
             }
       return $result
+};
+
+declare function api:can-do($right,$username,$owner := ()) {
+  let $user := u:users($username)
+  return if ($api:is-worker)then true() else u:can-do($user, $right, $owner)
 };

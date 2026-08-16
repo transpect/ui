@@ -38,28 +38,39 @@ declare function worker:get-run($element as (element(converter)|element(worker))
     return for $id in $converter-ids return worker:get($element, string-join(('','api','en','converter', $id, 'runs'),'/'))[2]/run
 };
 
+declare function worker:stop-run($converter as element(converter), $runid, $username) {
+  let $worker := worker:get-by-id($converter/@worker)
+  return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $runid,'cancel'),'/'),map {'username': $username})[2]
+};
+
+declare function worker:get-file-logs($converter as element(converter), $run) as element(line)* {
+  let $worker := worker:get-by-id($converter/@worker)
+  return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'logs'),'/'))[2]//line
+};
+
 declare %private function worker:get-converter($worker as element(worker)) {
   worker:get($worker,'/api/en/converter')[2]/* update {insert node attribute worker {$worker/@id} into .}
 };
 
-declare function worker:get($worker as element(worker), $url, $header := ()) {
-  let $result := worker:request($worker/base-url || $url, $header)
+declare function worker:get($worker as element(worker), $url, $header := map {}) {
+  let $result := worker:request($worker/base-url || $url, for $k in map:keys($header) return <http:header name='{$k}' value='{$header?$k}'/>)
   return $result
 };
 
-declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string? := 'transpectui') {
-  worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username)[2]
+declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string? := 'transpectui') as element(run)?{
+  worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username)[2]/run
 };
 
 declare function worker:post($worker as element(worker), $url as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string) {
-  let $header := 
+  let $header :=( 
+        <http:header name='username' value='{$username}'/>,
         <http:multipart media-type='multipart/form-data'>
-          <http:header name='username' value='{$username}'/>
           <http:header name='content-disposition'
             value='form-data; name="file"; filename="{ map:keys($file)[1] }"'/>
           <http:body media-type='application/octet-stream'/>
-        </http:multipart>,
-      $result := worker:request($worker/base-url || $url, $header, map:items($file)[1], 'POST')
+        </http:multipart>),
+      $result := worker:request($worker/base-url || $url, $header, map:items($file)[1], 'POST'),
+      $store := store:put('post',$result)
 return $result
 };
 

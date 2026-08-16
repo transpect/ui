@@ -55,19 +55,26 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       ),
       
       $store := st:set('params', $runid, $parameters),
+      $start-callback := $ns:store || " declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')",
+      $end-callback := $ns:make || " declare variable $job-id external; make:store-job-messages('" || $runid || "',$job-id)",
       $queue-job :=
         queue:register(
-          $ns:store || " declare variable $parameters external; declare variable $options external; proc:execute('make',$parameters,$options), st:set('status', '" || $runid || "', 'stopped'), st:set('end', '" || $runid || "', job:execute('current-dateTime()'))",
+          $ns:store || " declare variable $parameters external;
+                         declare variable $options external;
+                         proc:execute('make',$parameters,$options),
+                         st:set('status', '" || $runid || "', 'stopped'),
+                         st:set('end', '" || $runid || "',job:execute('current-dateTime()'))",
           map {'parameters':$parameters,'options':$options},
           map {'cache':true(), 'id':hf:id('make-target')},
-          $ns:store || "declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')"),
+          $start-callback,
+          $end-callback),
       $wait := prof:sleep(1000),
       $store := st:set('queue-id',$runid,$queue-job?id),
       $is-pending := queue:is-pending($queue-job?id),
       $store := if ($is-pending) then st:set('status',$runid, 'pending'),
       $error-message := ()
   return element run {
-           attribute runid {$runid},
+           element runid {$runid},
            element error {string-join($error-message,' ')} [$error-message]
          }
 };
@@ -291,7 +298,7 @@ declare function make:run-info-display($run as element(run), $converter as eleme
     }
 };
 
-declare function make:get-file-logs($file) {
+declare function make:get-file-logs($file) as element(line)*{
   let $log-dir := (($file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
       $logs :=
         if (file:exists($log-dir))
@@ -300,7 +307,7 @@ declare function make:get-file-logs($file) {
           let $mod-by := file:last-modified($log-dir || '/' || $file)
           order by $mod-by
           where file:exists($log-dir || '/' ||$file)
-          return map {'text': file:read-text($log-dir || '/' ||$file),'time': $mod-by}
+          return element line {attribute time {$mod-by}, file:read-text($log-dir || '/' ||$file)}
         else ()
   return $logs
 };

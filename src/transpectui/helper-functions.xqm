@@ -177,6 +177,20 @@ declare function hf:format-dateTime($dateTime as xs:dateTime) as xs:string {
   format-dateTime($dateTime,'[D,2].[M,2].[Y,4] [H,2]:[m,2]:[s,2]')
 };
 
+declare function hf:static-replace-variables($text,$bindings as map(*)? := map {},$quotes as xs:string? := "'",$no-quotes as xs:boolean := false()) as xs:string {
+  if (count(map:keys($bindings)) eq 0)
+  then $text
+  else let $first-key := map:keys($bindings)[1],
+           $first-value := if ($no-quotes) then ($bindings?$first-key) else ($quotes || $bindings?$first-key || $quotes),
+           $first-external-removed := replace($text,'declare variable \$' || $first-key  || ' external;',()),
+           $first-replaced :=
+             if (exists($bindings?$first-key))
+             then replace($first-external-removed,'\$' || $first-key,replace($first-value,'\$','||DOLLAR||'))
+             else replace($first-external-removed,'\$' || $first-key,'()') ,
+           $first-key-removed := map:remove($bindings,$first-key)
+       return replace(hf:static-replace-variables($first-replaced, $first-key-removed, $quotes, $no-quotes),'\|\|DOLLAR\|\|','\$')
+};
+
 declare function hf:format-duration($duration as xs:dayTimeDuration) as xs:string {
   let $days := days-from-duration($duration),
       $hours := hours-from-duration($duration),

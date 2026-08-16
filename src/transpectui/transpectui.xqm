@@ -9,8 +9,7 @@ import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
 
 declare function ui:check($right as xs:string?, $lang as xs:string, $return-url as xs:string?, $owner as xs:string? := ()){
   let $is-logged-in := exists(ui:access-session('username')),
-      $is-allowed := ui:check-only($right, $owner),
-      $log := hf:log($right || ': ' || ui:access-session('username') || ' => ' || $is-allowed,'CHECK')
+      $is-allowed := ui:check-only($right, $owner)
   return
     if ($is-logged-in)
     then if ($is-allowed)
@@ -22,7 +21,8 @@ declare function ui:check($right as xs:string?, $lang as xs:string, $return-url 
 declare function ui:check-only($right as xs:string?, $owner as xs:string? := ()){
   let $username := ui:access-session('username'),
       $token := ui:access-session('token'),
-      $is-allowed := u:check($username, $token, $right) or ($owner eq ui:access-session('username'))
+      $is-allowed := u:check($username, $token, $right) or ($owner eq $username),
+      $log := hf:log($right || ': ' || ui:access-session('username') || '(' || $owner || ') => ' || $is-allowed,'CHECK')
   return $is-allowed
 };
 
@@ -171,7 +171,7 @@ function ui:converter-convert($converter-id as xs:string, $file as map(xs:string
       $run as element(run) := make:start-target-run('conversion', $converter, $text-params, $file, ui:access-session('username')) 
   return if ($run/error)
          then web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/error/' || $run/error)) 
-         else web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/runs/'   || $run/id))
+         else web:redirect(config:url('/' || $lang ||'/converter/' || $converter-id || '/runs/'   || $run/runid))
 };
 
 declare
@@ -185,10 +185,10 @@ function ui:worker-converter-convert($worker-id as xs:string, $converter-id as x
       $text-params := map:remove(request:parameter-map(),'upload_file_uploaded_data'),
       $worker := worker:get-by-id($worker-id),
       $converter as element(converter) := worker:converter(worker:get-by-id($worker-id),$converter-id),
-      $run as element(run) := worker:convert($worker, $converter-id, $file, session:get('username'))
-  return if ($run/error)
+      $run as element(run)? := worker:convert($worker, $converter-id, $file, session:get('username'))
+  return if ($run/error or not(exists($run)))
          then web:redirect(config:url('/' || $lang || '/worker/' || $worker-id || '/converter/' || $converter-id || '/error/' || $run/error)) 
-         else web:redirect(config:url('/' || $lang || '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs/'  || $run/id))
+         else web:redirect(config:url('/' || $lang || '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs/'  || $run/runid))
 };
 
 declare
@@ -234,8 +234,22 @@ declare
   %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}/cancel")
 function ui:stop-run-frontend($runid, $lang, $converter-id, $return-url){
   let $run := make:get-run($runid),
-      $is-allowed := true(),
+      $is-allowed := ui:check-only($converter-id || ':admin',$run/username),
       $cancel := if ($is-allowed) then make:stop-run($runid) else ()
+  return web:redirect(config:url($return-url))
+};
+
+declare
+  %rest:GET
+  %rest:query-param("url", "{$return-url}")
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/cancel")
+function ui:stop-worker-run-frontend($worker-id, $converter-id, $runid, $lang, $return-url){
+  let $worker := worker:get-by-id($worker-id),
+      $converter := worker:converter($worker,$converter-id),
+      $run := worker:get-run($converter,$runid),
+      $username := ui:access-session('username'),
+      $is-allowed := ui:check-only($worker-id || $converter-id || ':admin',$run/username),
+      $cancel := if ($is-allowed) then worker:stop-run($converter, $runid, $username) else ()
   return web:redirect(config:url($return-url))
 };
 
@@ -735,6 +749,7 @@ declare %private function ui:access-session($name,$value) {
 };
 
 declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
+  ui:check($context?right, $context?lang, $context?return-url),
   let $runs := make:get-runs($converter),
       $allowed-runs := 
         for $runid in map:keys($runs)
@@ -752,8 +767,7 @@ declare function ui:build-runs-page($converter as element(converter), $context a
         for $runid in $allowed-runs
         where xs:boolean($runs?$runid/status/text() eq 'pending')
         return $runid
-  return(
-    ui:check($context?right, $context?lang, $context?return-url),
+  return
     element html {
       ui:get-html-head($context),
       element body {
@@ -771,8 +785,8 @@ declare function ui:build-runs-page($converter as element(converter), $context a
             then make:empty-run-info('empty-pending',$context?lang)
             else
               for $runid in $pending-runs
-              let $run as map(*) :=$runs?$runid
-              order by xs:dateTime($run?start) descending
+              let $run as element(run) :=$runs?$runid
+              order by xs:dateTime($run/start/text()) descending
               return make:run-info-display($run, $converter, $context)
           },
           element div {
@@ -782,8 +796,8 @@ declare function ui:build-runs-page($converter as element(converter), $context a
             then make:empty-run-info('empty-running',$context?lang)
             else
               for $runid in $running-runs
-              let $run as map(*) :=$runs?$runid
-              order by xs:dateTime($run?start) descending
+              let $run as element(run) :=$runs?$runid
+              order by xs:dateTime($run/start/text()) descending
               return make:run-info-display($run, $converter, $context)
           },
           element div {
@@ -800,7 +814,6 @@ declare function ui:build-runs-page($converter as element(converter), $context a
         }
       }
     }
-  )
 };
 
 declare function ui:build-run-page($converter as element(converter), $run as element(run), $context as map(xs:string,item()*)){
@@ -820,11 +833,10 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
         $start as xs:dateTime := xs:dateTime($run/start),
         $end as xs:dateTime? := if (exists($run/end)) then xs:dateTime($run/end) else (),
         $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run/start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
-        $refresh := if ($is-running) then 5 else  (),
-        $url := '/converter/' || $converter/@id || '/runs/' || $runid,
+        $refresh := if ($is-running) then 5 else (),
         $context := map:merge(($context, map {'status': $short-status || ' ', 'refresh': $refresh, 'subtitle':$subtitle})),
         $log-dir := (($run/file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
-        $logs := make:get-file-logs($run/file),
+        $logs as element(line)* := if ($converter/@worker) then worker:get-file-logs($converter,$run) else make:get-file-logs($run/file),
         $job-results := make:store-job-messages($runid),
         $post-conv-actions := conv:get-post-conv-actions($converter),
         $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
@@ -844,7 +856,7 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
             element div {
               attribute class {'well'},
               element h3 {i18n:val($status,$context?lang)},
-              hf:create-anchor(config:url('/' ||$context?lang || '/converter/' || $converter/@id || '/runs/' || $runid || '/cancel' || '?url=/' || $context?lang || $url), i18n:val("cancel",$context?lang))[not($run/status = ('stopped','canceled'))]
+              hf:create-anchor(config:url($runid || '/cancel' || '?url=/' || $context?lang || $context?url), i18n:val("cancel",$context?lang))[not($run/status = ('stopped','canceled'))]
             },
             element details {
               attribute class {'make-parameters well'},
@@ -865,8 +877,8 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
               return element div {
                 attribute class {'log-entry'},
                 element span {attribute class {'index'}, $index},
-                element span {attribute class {'time'}, hf:format-dateTime($log?time)},
-                element span {$log?text}
+                element span {attribute class {'time'}, hf:format-dateTime($log/@time)},
+                element span {$log/text()}
               }
             },
           element details {
