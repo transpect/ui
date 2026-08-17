@@ -48,12 +48,22 @@ declare function worker:get-file-logs($converter as element(converter), $run) as
   return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'logs'),'/'))[2]//line
 };
 
+declare function worker:get-result-files($worker as element(worker), $converter as element(converter), $run as element(run)) as element(file)* {
+  let $files := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'files'),'/'))[2]//file
+  return $files
+};
+
+declare function worker:get-file($worker as element(worker), $converter as element(converter), $run as element(run), $filename as xs:string) as xs:base64Binary {
+  let $files := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'download', $filename),'/'),map {},(),'application/octet-stream')[2]
+  return $files
+};
+
 declare %private function worker:get-converter($worker as element(worker)) {
   worker:get($worker,'/api/en/converter')[2]/* update {insert node attribute worker {$worker/@id} into .}
 };
 
-declare function worker:get($worker as element(worker), $url, $header := map {}) {
-  let $result := worker:request($worker/base-url || $url, for $k in map:keys($header) return <http:header name='{$k}' value='{$header?$k}'/>)
+declare function worker:get($worker as element(worker), $url as xs:string, $header as map(*)?:= map {},$body as item()? := (), $override-media-type as xs:string? := ()) {
+  let $result := worker:request($worker/base-url || $url, for $k in map:keys($header) return <http:header name='{$k}' value='{$header?$k}'/>,$body,'get',$override-media-type)
   return $result
 };
 
@@ -74,20 +84,25 @@ declare function worker:post($worker as element(worker), $url as xs:string, $fil
 return $result
 };
 
-declare function worker:get-by-id($worker-id as xs:string){
+declare function worker:get-by-id($worker-id as xs:string?){
+  hf:log($worker-id,'W-ID'),
   $worker:worker[@id eq $worker-id]
 };
 
 (: 
  : most basic request wrapper
  :)
-declare %private function worker:request($url, $header := (), $body as item()* := (), $method as xs:string := 'get') {
-  http:send-request( 
-    element http:request {
-      attribute method {$method},
-      $header
-    },
-    $url,
-    $body
-  )
+declare %private function worker:request($url, $header := (), $body as item()* := (), $method as xs:string := 'get', $override-media-type as xs:string? := ()) {
+  let $result := 
+        http:send-request( 
+          element http:request {
+            attribute method {$method},
+            (attribute override-media-type {$override-media-type})[$override-media-type],
+            $header
+          },
+          $url,
+          $body
+        ),
+      $store := store:put('get',$result)
+  return $result
 };

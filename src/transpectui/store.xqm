@@ -9,13 +9,12 @@ declare variable $st:cache-max-age := xs:dayTimeDuration('PT1H0M0S');
  : wrapper module for basex store access
  :)
  
- (:TODO: everything in here is xml:)
-
 declare function st:set($prefix, $runid, $value){
   if (store:keys() = $st:cache-key)
   then st:set-in-cache($prefix, $runid, $value)
-  else (),
+  else (st:rebuild-cache(), st:set-in-cache($prefix, $runid, $value)),
   
+  if (not(file:exists("/opt/data/runs/"))) then file:create-dir("/opt/data/runs/") else (),
   if (not(file:exists("/opt/data/runs/" || $runid))) then file:create-dir("/opt/data/runs/" || $runid) else (),
   
   if ($value instance of element()) 
@@ -46,7 +45,7 @@ declare function st:list($use-cache as xs:boolean? := true()) as xs:string* {
     then for $run in store:get($st:cache-key) return $run?runid
     else st:rebuild-cache()
   else 
-    let $runids := file:list("/opt/data/runs") ! tokenize(.,'/')[1]
+    let $runids := if (file:exists("/opt/data/runs")) then file:list("/opt/data/runs") ! tokenize(.,'/')[1] else ()
     return
       for $runid in $runids
       let $file := st:get('file',$runid),
@@ -61,11 +60,17 @@ declare function st:get-run($runid as xs:string) as element(run)?{
   }
 };
 declare function st:get-run-map($runid as xs:string) as map(xs:string, item()*){
-  map:build(
-    file:list('/opt/data/runs/' || $runid),
-    keys := fn { . },
-    value := fn { st:get(.,$runid) }
-  )
+  let $path := '/opt/data/runs/' || $runid,
+      $exists := file:exists($path)
+  return
+      if ($exists)
+      then
+        map:build(
+          file:list($path),
+          keys := fn { . },
+          value := fn { st:get(.,$runid) }
+        )
+      else map {}
 };
 
 (: store cache :)

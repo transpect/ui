@@ -6,6 +6,7 @@ import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
+import module namespace tr = 'http://le-tex.de/transpect' at 'transpect.xqm';
 
 declare function ui:check($right as xs:string?, $lang as xs:string, $return-url as xs:string?, $owner as xs:string? := ()){
   let $is-logged-in := exists(ui:access-session('username')),
@@ -21,7 +22,7 @@ declare function ui:check($right as xs:string?, $lang as xs:string, $return-url 
 declare function ui:check-only($right as xs:string?, $owner as xs:string? := ()){
   let $username := ui:access-session('username'),
       $token := ui:access-session('token'),
-      $is-allowed := u:check($username, $token, $right) or ($owner eq $username),
+      $is-allowed := tr:check($username, $token, $right) or ($owner eq $username),
       $log := hf:log($right || ': ' || ui:access-session('username') || '(' || $owner || ') => ' || $is-allowed,'CHECK')
   return $is-allowed
 };
@@ -48,7 +49,7 @@ function ui:converter-list($lang as xs:string){
           element div {
             attribute class {'well'},
             for $converter in ($converters)
-            let $allowed := ui:check-only($converter/@worker || $converter/@id || ':convert')
+            let $allowed := ui:check-only($converter/@worker || '-' || $converter/@id || ':convert')
             return
               if (exists($converter/@worker))
               then ui:create-anchor($converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url(string-join(('', $lang, 'worker', $converter/@worker, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
@@ -104,7 +105,7 @@ declare
 function ui:converter-page($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
   let $converter := worker:converter(worker:get-by-id($worker-id),$converter-id),
       $url := string-join(('','worker', $worker-id, 'converter', $converter-id),'/'),
-      $right := $worker-id || $converter-id || ':convert',
+      $right := $worker-id || '-' || $converter-id || ':convert',
       $title := $converter/xs:string(@name) || ' (' || $worker-id ||  ')',
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url}
   return if (exists($converter)) then ui:build-converter-page($converter, $context) else web:redirect(config:url('/' || $lang || '/converter'))
@@ -153,7 +154,7 @@ function ui:get-worker-converter-runs($worker-id as xs:string, $converter-id as 
       $title := i18n:val('conversions',$lang),
       $url := '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs',
       $return-url := '/converter/' || $converter-id,
-      $right := $worker-id || $converter-id || ':conversions',
+      $right := $worker-id || '-' || $converter-id || ':conversions',
       $context := map {'title': $title, 'lang': $lang, 'return-url':$return-url, 'url':$url, 'right':$right, 'username': $username}
   return ui:build-runs-page($converter, $context)
 };
@@ -224,7 +225,7 @@ function ui:worker-run-info($worker-id as xs:string, $converter-id as xs:string,
         $title as xs:string? := $run/filename,
         $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url}
         
-    return ui:build-run-page($converter, $run, $context)
+    return ui:build-run-page($converter, $run, $context, $worker)
     )
 };
 
@@ -255,8 +256,8 @@ function ui:stop-worker-run-frontend($worker-id, $converter-id, $runid, $lang, $
 
 declare
   %rest:GET
-  %rest:path("/run/{$runid}/download/{$filename}")
-function ui:download($runid, $filename) {
+  %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}/download/{$filename}")
+function ui:download($lang, $converter-id, $runid, $filename) {
   let $outpath := make:get-run($runid)?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $filepath := $outpath || $filename,
       $filesize := file:size($filepath),
@@ -272,10 +273,26 @@ function ui:download($runid, $filename) {
 
 declare
   %rest:GET
-  %rest:path("/run/{$runid}/show/{$filename}")
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/download/{$filename}")
+function ui:worker-download($lang as xs:string, $worker-id as xs:string, $converter-id as xs:string, $runid as xs:string, $filename as xs:string) {
+  let $format := $filename ! tokenize('.')[last()],
+      $worker := worker:get-by-id($worker-id),
+      $converter := worker:converter($worker, $converter-id),
+      $run := worker:get-run($converter, $runid),
+      $data := worker:get-file($worker, $converter, $run, $filename)
+  return
+      (web:response-header(
+        map { 'media-type': 'application/' || $format},
+        map { 'Content-Disposition': 'attachement;filename=' || $filename}),
+       $data)
+};
+
+declare
+  %rest:GET
+  %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}/show/{$filename}")
   %output:method("html")
   %output:html-version('5')
-function ui:show($runid, $filename) {
+function ui:show($lang, $converter-id, $runid, $filename) {
   if (ui:check-only(''))
   then
     let $outpath := make:get-run($runid)?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
@@ -292,7 +309,26 @@ function ui:show($runid, $filename) {
 
 declare
   %rest:GET
-  %rest:path("/run/{$runid}/{$filename}/action/{$action-name}")
+  %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/show/{$filename}")
+  %output:method("html")
+  %output:html-version('5')
+function ui:worker-show($lang, $worker-id, $converter-id, $runid, $filename) {
+  if (ui:check-only(''))
+  then
+    let $extention := ($filename => tokenize('[\./]'))[last()],
+        $show-direct as xs:boolean := $extention = ('xhtml','html'),
+        $format := $filename ! tokenize('.')[last()],
+        $worker := worker:get-by-id($worker-id),
+        $converter := worker:converter($worker, $converter-id),
+        $run := worker:get-run($converter, $runid),
+        $data := worker:get-file($worker, $converter, $run, $filename)
+    return if ($show-direct) then $data else web:error('415','Das Dokument kann nicht angezeigt werden.')
+  else web:error(403, 'You are not allowed to access this file.')
+};
+
+declare
+  %rest:GET
+  %rest:path("/runs/{$runid}/{$filename}/action/{$action-name}")
 function ui:post-conversion-action($runid, $filename, $action-name as xs:string) {
   let $outpath := make:get-run($runid)?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $filepath := $outpath || $filename,
@@ -580,14 +616,22 @@ function ui:user($lang, $username-to-update, $return-url){
         element div {
           attribute class {'well'},
           element h3 {i18n:val('roles',$lang)},
-          for $role in u:roles()/role
+          for $role in tr:roles()/role
           let $name := $role/xs:string(@name),
               $has-role := $user-roles = $name
           return element div {
-                    element span {$name || ': '},
                   if ($has-role)
-                  then ui:create-anchor(i18n:val('remove',$lang), '/' || $lang || '/users/' || $username-to-update || '/roles/remove/' || $name || '?url=' || $url)
-                  else if (ui:check-only('u:mgmt')) then ui:create-anchor(i18n:val('add',$lang), '/' || $lang || '/users/' || $username-to-update || '/roles/add/' || $name || '?url=' || $url)
+                  then (
+                    element span{ attribute class {'date'},'[' || i18n:val('add',$lang) || ']'},
+                    ui:create-anchor('[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/remove/' || $name || '?url=' || $url)
+                  )
+                  else
+                    if (ui:check-only('u:mgmt'))
+                    then (
+                      ui:create-anchor('[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/add/' || $name || '?url=' || $url),
+                      element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
+                    ),
+                  element span {' - ' || $name}
           }
         },
         element div {
@@ -816,7 +860,7 @@ declare function ui:build-runs-page($converter as element(converter), $context a
     }
 };
 
-declare function ui:build-run-page($converter as element(converter), $run as element(run), $context as map(xs:string,item()*)){
+declare function ui:build-run-page($converter as element(converter), $run as element(run), $context as map(xs:string,item()*), $worker as element(worker)? := ()){
   ( ui:check('', $context?lang, $context?url),
     let $status as xs:string := $run/status,
         $is-running as xs:boolean := $status eq 'running' or $status eq 'pending',
@@ -839,14 +883,12 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
         $logs as element(line)* := if ($converter/@worker) then worker:get-file-logs($converter,$run) else make:get-file-logs($run/file),
         $job-results := make:store-job-messages($runid),
         $post-conv-actions := conv:get-post-conv-actions($converter),
-        $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-        $result-files :=
+        $result-files as element(file)*:=
           if ($converter/@worker)
-          then ()
+          then 
+            worker:get-result-files($worker, $converter, $run)
           else
-            for $file in file:list($out-path)
-            where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
-            return {'name': normalize-space($file), 'path': $out-path || normalize-space($file)}
+            make:get-result-files($run)
     return (
       element html {
         ui:get-html-head($context),
@@ -886,33 +928,31 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
             if ($status eq 'stopped') then attribute open {} else (),
             element summary {i18n:val('results',$context?lang)},
             for $file in $result-files
-            let $extention := ($file?name => tokenize('[\./]'))[last()],
-                $show-direct as xs:boolean := $extention = ('xhtml','html')
+            let $extention := ($file/@name => tokenize('[\./]'))[last()],
+                $show-direct as xs:boolean := $extention = ('xhtml','html'),
+                $url := 
+                    if (exists($converter/@worker))
+                    then config:url('/' || $context?lang || '/worker/' || $converter/@worker || '/converter/' || $converter/@id || '/runs/' || $runid || (if ($show-direct) then '/show/' else '/download/') || $file/@name)
+                    else config:url('/' || $context?lang || '/converter/' || $converter/@id || '/runs/' || $runid || (if ($show-direct) then '/show/' else '/download/') || $file/@name)
             return element div {
               attribute class {'line d-flex'},
               element div {
                 attribute class {'filename'},
-                if ($show-direct)
-                then
-                  element a {
-                    attribute href {config:url('/' || $context?lang || '/converter/' || $converter/@id || '/runs/' || $runid || '/show/' || $file?name)},
-                    attribute target {'_blank'},
-                    $file?name}
-                else
-                  element a {
-                    attribute href {config:url('/runs/' ||$runid || '/download/' || $file?name)},
-                    attribute target {'_blank'},
-                    attribute download {$file?name},
-                    $file?name}},
+                element a {
+                  attribute href {$url},
+                  attribute target {'_blank'},
+                  attribute download {$file/@name},
+                  xs:string($file/@name)
+                }},
               element div {
                 attribute class {'actions'},
                 for $action in $post-conv-actions
-                where matches($file?name, $action/xs:string(@regex))
+                where matches($file/@name, $action/xs:string(@regex))
                 return
                   element input{
                     attribute type {'button'},
                     attribute value {$action/xs:string(@message)},
-                    attribute data-href {config:url(string-join(('/run',$runid, $file?name, 'action', $action/xs:string(@target)),'/'))}
+                    attribute data-href {config:url(string-join(('/run',$runid, $file/@name, 'action', $action/xs:string(@target)),'/'))}
                   }
               }
             }

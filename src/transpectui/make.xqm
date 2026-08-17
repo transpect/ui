@@ -8,6 +8,7 @@ import module namespace st = 'http://le-tex.de/store' at 'store.xqm';
 import module namespace queue = 'http://le-tex.de/queue' at 'queue.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace worker = 'http://le-tex.de/worker' at '/opt/basex/webapp/transpectui/worker.xqm';
+import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/transpectui/transpect.xqm';
 
 (: 
  : wrapper module for the orchestration of conversion runs.
@@ -157,7 +158,7 @@ declare function make:allowed($username as xs:string*, $run as element(run)){
   let $converter-id := $run/converter/text(),
       $username := $run/username/text()
   return 
-      (u:can-do(u:users($username),$converter-id || ':runs')
+      (tr:can-do($username,$converter-id || ':runs')
    or ($username eq $username))
    or (
       let $my-groups := u:groups($username),
@@ -310,4 +311,13 @@ declare function make:get-file-logs($file) as element(line)*{
           return element line {attribute time {$mod-by}, file:read-text($log-dir || '/' ||$file)}
         else ()
   return $logs
+};
+
+declare function make:get-result-files($run as element(run)) as element(file)* {
+  let $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $files :=
+        for $file in file:list($out-path)
+        where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
+        return element file {attribute name {normalize-space($file)}, attribute path {$out-path || normalize-space($file)}}
+  return $files
 };

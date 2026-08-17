@@ -6,6 +6,7 @@ import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-func
 import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
+import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/transpectui/transpect.xqm';
 import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
 
 declare variable $api:config := $config:file/configurations/configuration/api;
@@ -158,7 +159,6 @@ function api:get-converter-runs($converter-id as xs:string, $runid as xs:string 
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
-
 declare
   %rest:GET
   %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/logs")
@@ -173,6 +173,23 @@ function api:get-converter-run-file-logs($converter-id as xs:string, $runid as x
   return 
     if (xs:boolean($authed/@allowed))
     then element file-log {$file-logs}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/files")
+  %output:method("xml")
+function api:get-converter-run-file-results($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $run as element(run) := make:get-run($runid),
+      $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $files := make:get-result-files($run)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element result-files {$files}
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -394,5 +411,5 @@ declare %private function api:auth($headers as map(xs:string, xs:string*)?, $all
 
 declare function api:can-do($right,$username,$owner := ()) {
   let $user := u:users($username)
-  return if ($api:is-worker)then true() else u:can-do($user, $right, $owner)
+  return if ($api:is-worker)then true() else tr:can-do($user, $right, $owner)
 };

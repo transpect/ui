@@ -91,13 +91,13 @@ declare function u:roles-for-user($user as element(user)) as xs:string* {
   $user/roles/role/xs:string(@name)
 };
 
-declare function u:roles-for-right($right as xs:string?) as xs:string* {
+declare function u:roles-for-right($right as xs:string?, $dynamic-roles as element(role)* := ()) as xs:string* {
   distinct-values((
     if ($right)
-    then u:roles()/role[right/@name eq $right]/xs:string(@name)
-    else u:roles()/role/xs:string(@name),
+    then (u:roles()/role, $dynamic-roles)[right/@name eq $right]/xs:string(@name)
+    else (u:roles()/role, $dynamic-roles)/xs:string(@name),
     
-    for $role in u:roles()/role
+    for $role in (u:roles()/role, $dynamic-roles)
       where
       	if (exists($role/right/@matches))
         then exists($role/right[matches($right,@matches)])
@@ -222,9 +222,9 @@ declare function u:clear-tokens($username) {
  (:
   : Shortcut for u:validate-token and u:can-do
   :)
-declare function u:check($username as xs:string?, $token as xs:string?, $right as xs:string?) {
+declare function u:check($username as xs:string?, $token as xs:string?, $right as xs:string?, $owner as xs:string? := (), $dynamic-roles as element(role)* := ()) {
   let $is-valid := u:validate-token($username, $token),
-      $is-allowed := if ($is-valid) then u:can-do(u:users-int($username), $right) else false()
+      $is-allowed := if ($is-valid) then u:can-do(u:users-int($username), $right, $dynamic-roles, $owner) else false()
   return $is-allowed
 };
 
@@ -274,12 +274,12 @@ declare function u:set-password($username, $password) {
   return $add-user/users/user[username eq $username]
 };
 
-declare function u:can-do($user as element(user)?, $right as xs:string, $owner-name as xs:string? := ()) as xs:boolean {
+declare function u:can-do($user as element(user)?, $right as xs:string, $dynamic-roles as element(role)*, $owner-name as xs:string? := ()) as xs:boolean {
   let $user-roles := $user/roles
   return
     let $matching-roles := 
       for $user-role in $user-roles/role
-      where (u:roles-for-right($right) = u:roles-for-username($user/username))
+      where (u:roles-for-right($right, $dynamic-roles) = u:roles-for-username($user/username))
          or (if (exists($user-role/@matches)) then matches($right, $user-role/@matches) else false())
       return $user-role
     return ((count($matching-roles) gt 0) or ($owner-name eq $user/username/text()))  
@@ -304,12 +304,12 @@ declare %private function u:update-token($tokens as map(*)*,$token-string as xs:
   return u:put-tokens($username, ($rest,$updated-token))
 };
 
-declare %private function u:can-do-details($user, $right) as element(role)* {
+declare %private function u:can-do-details($user, $right, $dynamic-roles as element(role)* := ()) as element(role)* {
 let $user-roles := $user/roles
   return
     let $matching-roles := 
       for $user-role in $user-roles/role
-      where (u:roles-for-right($right) = u:roles-for-username($user/username))
+      where (u:roles-for-right($right, $dynamic-roles) = u:roles-for-username($user/username))
          or (if (exists($user-role/@matches)) then matches($right, $user-role/@matches) else false())
       return $user-role
     return $matching-roles
