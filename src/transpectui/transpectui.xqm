@@ -32,7 +32,7 @@ declare
   %rest:path("/")
   %output:method("html")
   %output:html-version('5')
-function ui:default-2() {
+function ui:default() {
   web:redirect(config:url('/de' ))
 };
 
@@ -42,8 +42,7 @@ declare
   %output:method("html")
   %output:html-version('5')
 function ui:default($lang) {
-  let $right := 'tr:list',
-      $title := 'TranspectUI',
+  let $title := 'TranspectUI',
       $header := request:header-map(),
       $username := ui:access-session('username'),
       $converters as element(converter)* := (conv:get-all()),
@@ -51,21 +50,21 @@ function ui:default($lang) {
       $url := '/',
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url}
   return (
-    ui:check($right, $lang, $url),
+    ui:check('', $lang, $url),
     let $content := (
           element div {
             attribute class {'well'},
             element h3 {i18n:val('converters',$lang)},
             for $c in $converters
             let $allowed := ui:can-do($username,$url || 'converter/' || $c/@id)
-            return ui:create-anchor(xs:string($c/@name),'/' || $lang || '/converter/' || $c/@id,(),$allowed)
+            return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/converter/' || $c/@id,(),$allowed)
           }[count($converters) gt 0 ],
           element div {
             attribute class {'well'},
             element h3 {i18n:val('workers',$lang)},
             for $c in $worker-converters
             let $allowed := ui:can-do($username,$url || '/worker/' || $c/@worker || '/converter/' || $c/@id)
-            return ui:create-anchor(xs:string($c/@name) || ' (' || $c/@worker || ')','/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,(),$allowed)
+            return ui:create-anchor($context, xs:string($c/@name) || ' (' || $c/@worker || ')','/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,(),$allowed)
           }[count($worker-converters) gt 0 ]),
         $description := 
           element div {
@@ -108,7 +107,7 @@ function ui:converter-list($lang as xs:string){
               attribute class {'well'},
               for $converter in ($converters)
               let $allowed := ui:check-only($converter/@worker || '-' || $converter/@id || ':convert')
-              return ui:create-anchor($converter/xs:string(@name), config:url(string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
+              return ui:create-anchor($context, $converter/xs:string(@name), config:url(string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
             },
           $description := ''
       return ui:page($context,$content,$description)
@@ -145,7 +144,7 @@ function ui:worker-list($lang as xs:string){
               return
               element div {
                 attribute class {''},
-                ui:create-anchor(xs:string($worker/@id),config:url('/' || $lang || $url), (),$allowed),
+                ui:create-anchor($context, xs:string($worker/@name),config:url('/' || $lang || $url), (),$allowed),
                 element span {
                   attribute class {if ($status eq 'running') then 'green' else 'red'},
                   attribute title {i18n:val($status,$lang)},
@@ -181,7 +180,7 @@ function ui:worker-page($worker-id as xs:string, $lang as xs:string){
           let $url := '/worker/' || $converter/@worker || '/converter/' || $converter/@id,
               $allowed := ui:can-do($username, $url)
           return
-            ui:create-anchor($converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url('/' || $lang || $url), 'block', $allowed)
+            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url('/' || $lang || $url), 'block', $allowed)
         }
       }
     }
@@ -212,7 +211,7 @@ function ui:worker-converter-list($worker-id as xs:string, $lang as xs:string){
           let $url := '/worker/' || $converter/@worker || '/converter/' || $converter/@id,
               $allowed := ui:can-do($username, $url)
           return
-            ui:create-anchor($converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url('/' || $lang || $url), 'block', $allowed)
+            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url('/' || $lang || $url), 'block', $allowed)
         }
       }
     }
@@ -399,7 +398,7 @@ function ui:run-info($converter-id as xs:string, $runid as xs:string, $lang as x
     let $converter as element(converter) := conv:get($converter-id),
         $run as map(*) := make:get-run($runid),
         $title as xs:string? := $run?filename,
-        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url}
+        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url, 'refresh': 5}
         
     return ui:build-run-page($converter, $run, $context)
     )
@@ -589,7 +588,7 @@ function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $messa
             $message
           },
           element div {
-            ui:create-anchor(i18n:val('back',$lang), config:url($return-url))
+            ui:create-anchor($context, i18n:val('back',$lang), config:url($return-url))
           }
         }
       }
@@ -654,6 +653,117 @@ function ui:user-new($lang,$username-to-create,$password, $return-url){
       $log := if ($can-do) then hf:log('create new user: ' ||$username-to-create)
   return web:redirect(config:url('/' || $lang ||$return-url))
 };
+
+declare
+  %rest:GET
+  %rest:path("/{$lang}/users/{$username-to-update}")
+  %rest:query-param("url","{$return-url}")
+  %output:method("html")
+  %output:html-version('5')
+function ui:user($lang, $username-to-update, $return-url){
+  let $title := i18n:val('user-preferences',$lang),
+      $username := ui:access-session('username'),
+      $session-ids :=
+        for $id in sessions:ids()
+        where sessions:get($id,'username') eq $username-to-update
+        return $id,
+      $url := '/users/' || $username-to-update,
+      $right := tr:endpoint-right($url),
+      $owner := tr:endpoint-owner($url),
+      $user-roles := u:roles-for-username($username-to-update),
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': ($return-url,'/converter/')[1], 'username': $username}
+  return (
+    ui:check($right, $lang, $url, $username-to-update),
+    ui:page($context,(
+      element div {
+        attribute class {'well'},
+        element h3 {i18n:val('sessions',$lang)},
+        for $id in $session-ids
+        return
+          element div {
+            attribute class {'well'},
+            element details {
+              element summary {$id},
+              for $name in sessions:names($id)
+              return
+                element div {
+                  element span {$name || ':' || sessions:get($id, $name)}
+                },
+              ui:create-anchor($context, 'Session löschen','/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url)
+              }
+          }
+      },
+      element div {
+        attribute class {'well'},
+        element h3 {i18n:val('roles',$lang)},
+        for $role in tr:roles()/role
+        let $name := $role/xs:string(@name),
+            $has-role := $user-roles = $name
+        return
+          element div {
+            if ($has-role)
+            then (
+              element span{ attribute class {'date'},'[' || i18n:val('add',$lang) || ']'},
+              ui:create-anchor($context, '[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/remove/' || $name || '?url=' || $url)
+            )
+            else
+              if (ui:check-only('u:mgmt'))
+              then (
+                ui:create-anchor($context, '[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/add/' || $name || '?url=' || $url),
+                element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
+              ),
+            element span {' - ' || $name},
+            element span {attribute class {'date'}, ' (rights: ' || string-join(for $right in $role/right return ($right/@name,$right/@matches),', ') || ')'}
+          }
+      },
+      element div {
+        attribute class {'well'},
+        element h3 {i18n:val('password',$lang)},
+        
+        element form-group {
+          attribute class {'form-group'},
+          element form {
+            attribute method {'POST'},
+            attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url},
+            attribute class {},
+            element form-group {
+              attribute class {'form-group'},
+              element label {
+                attribute for {'old-password'},
+                i18n:val('old-password',$lang)
+              },
+              element input {
+                attribute class {'form-control line'},
+                attribute type {'password'},
+                attribute name {'old-password'}
+              }
+            },
+            element form-group {
+              attribute class {'form-group'},
+              element label {
+                attribute for {'password'},
+                i18n:val('new-password',$lang)
+              },
+              element input {
+                attribute class {'form-control line'},
+                attribute type {'password'},
+                attribute name {'password'}
+              },
+              element form-group {
+                element input {
+                  attribute class {'form-control line'},
+                  attribute type {'submit'},
+                  attribute value {i18n:val('submit',$lang)}
+                }
+              }
+            }
+          }
+        }
+      }
+    ),())
+  )
+};
+
 declare
   %rest:GET
   %rest:path("/{$lang}/users/{$username-to-delete}/delete")
@@ -684,117 +794,6 @@ function ui:user-cancel-session($lang,$username-to-update,$id,$return-url){
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/users/{$username-to-update}")
-  %rest:query-param("url","{$return-url}")
-  %output:method("html")
-  %output:html-version('5')
-function ui:user($lang, $username-to-update, $return-url){
-  let $title := i18n:val('user-preferences',$lang),
-      $username := ui:access-session('username'),
-      $session-ids :=
-        for $id in sessions:ids()
-        where sessions:get($id,'username') eq $username-to-update
-        return $id,
-      $url := '/users/' || $username-to-update,
-      $right := 'u:mgmt',
-      $user-roles := u:roles-for-username($username-to-update),
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': ($return-url,'/converter/')[1]}
-  return (
-    ui:check($right, $lang, $url, $username-to-update),
-    element html {
-      ui:get-html-head($context),
-      element body {
-        ui:get-html-header($context),
-        element div {
-          attribute class {'well'},
-          element h3 {i18n:val('sessions',$lang)},
-          for $id in $session-ids
-          return
-            element div {
-              attribute class {'well'},
-              element details {
-                element summary {$id},
-                for $name in sessions:names($id)
-                return
-                  element div {
-                    element span {$name || ':' || sessions:get($id, $name)}
-                  },
-                ui:create-anchor('Session löschen','/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url)
-                }
-            }
-        },
-        element div {
-          attribute class {'well'},
-          element h3 {i18n:val('roles',$lang)},
-          for $role in tr:roles()/role
-          let $name := $role/xs:string(@name),
-              $has-role := $user-roles = $name
-          return element div {
-                  if ($has-role)
-                  then (
-                    element span{ attribute class {'date'},'[' || i18n:val('add',$lang) || ']'},
-                    ui:create-anchor('[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/remove/' || $name || '?url=' || $url)
-                  )
-                  else
-                    if (ui:check-only('u:mgmt'))
-                    then (
-                      ui:create-anchor('[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/add/' || $name || '?url=' || $url),
-                      element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
-                    ),
-                  element span {' - ' || $name}
-          }
-        },
-        element div {
-          attribute class {'well'},
-          element h3 {i18n:val('password',$lang)},
-          
-          element form-group {
-            attribute class {'form-group'},
-            element form {
-              attribute method {'POST'},
-              attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url},
-              attribute class {},
-              element form-group {
-                attribute class {'form-group'},
-                element label {
-                  attribute for {'old-password'},
-                  i18n:val('old-password',$lang)
-                },
-                element input {
-                  attribute class {'form-control line'},
-                  attribute type {'password'},
-                  attribute name {'old-password'}
-                }
-              },
-              element form-group {
-                attribute class {'form-group'},
-                element label {
-                  attribute for {'password'},
-                  i18n:val('new-password',$lang)
-                },
-                element input {
-                  attribute class {'form-control line'},
-                  attribute type {'password'},
-                  attribute name {'password'}
-                },
-                element form-group {
-                  element input {
-                    attribute class {'form-control line'},
-                    attribute type {'submit'},
-                    attribute value {i18n:val('submit',$lang)}
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )
-};
-
-declare
-  %rest:GET
   %rest:path("/{$lang}/users")
   %output:method("html")
   %output:html-version('5')
@@ -817,8 +816,8 @@ function ui:user-management($lang){
             return 
               element div {
                 attribute class {'d-flex'},
-                ui:create-anchor($user/username,'/' || $lang || '/users/' || $user/username),
-                ui:create-anchor(i18n:val('delete',$lang),'/' || $lang || '/users/' || $user/username || '/delete?url=' || $url) 
+                ui:create-anchor($context, $user/username,'/' || $lang || '/users/' || $user/username),
+                ui:create-anchor($context, i18n:val('delete',$lang),'/' || $lang || '/users/' || $user/username || '/delete?url=' || $url) 
               }
           }
         },
@@ -877,17 +876,31 @@ function ui:logout($lang, $url){
   web:redirect($url)
 };
 
-declare %private function ui:create-anchor($text as xs:string? := (), $href as xs:string? := '#', $classes as xs:string* := (), $allowed as xs:boolean := true()){
-  if ($allowed)
-  then hf:create-anchor(config:url($href), $text, $classes)
-  else
-    element span {
-      attribute class {string-join(($classes,'disallowed'),' ')},
-      attribute data-href {config:url($href)},
-      $text
-    }
+declare %private function ui:create-anchor($context, $text as xs:string? := (), $href as xs:string? := '#', $classes as xs:string* := (), $allowed as xs:boolean := true()){
+  let $right := tr:endpoint-right($href),
+      $owner := tr:endpoint-owner($href),
+      $roles-for-right := tr:roles-for-right($right),
+      $title := 
+        i18n:val('requires-right',$context?lang) ||
+        ' ' ||
+        $right ||
+        ' ' || 
+        i18n:val('in-role',$context?lang) ||
+        ': ' ||
+        string-join($roles-for-right,' ' ||
+          i18n:val('or',$context?lang) || ' '
+        )
+  return
+    if ($allowed)
+    then hf:create-anchor(config:url($href), $text, $classes, $href)
+    else
+      element span {
+        attribute class {string-join(($classes,'disallowed'),' ')},
+        attribute data-href {config:url($href)},
+        attribute title {$title},
+        $text
+      }
 };
-
 
 declare %private function ui:close-session($id) {
   let $log := hf:log($id, 'SESSION-CLOSE')
@@ -1076,7 +1089,7 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
             element details {
               attribute class {'make-logs well'},
               if ($status eq 'running') then attribute open {} else (),
-              element summary {i18n:val('logs',$context?lang) || '(' || count($logs) ||')'},
+              element summary {i18n:val('logs',$context?lang) || ' (' || count($logs) ||')'},
               for $log at $index in $logs
               return element div {
                 attribute class {'log-entry'},
@@ -1151,6 +1164,7 @@ declare function ui:build-converter-page($converter as element(converter), $cont
           attribute data-data {$context?username},
           attribute data-right {tr:endpoint-right($context?url || '/runs')},
           ui:create-anchor(
+            $context, 
             i18n:val('prev-conversions',$context?lang),
             config:url('/' || $context?lang || $context?url || '/runs'),(),
             ui:can-do($context?username, $context?url || '/runs')
@@ -1223,7 +1237,7 @@ declare %private function ui:page($context,$content,$description){
         element div {
           attribute class {'half'},
           $description
-        }
+        }[exists($description)]
       }
     }
   }
@@ -1263,7 +1277,8 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
         attribute href {config:url('/' || $context?lang)},
         element img {
           attribute class {"header"},
-          attribute src {config:url("/static/transpect.png")}
+          attribute src {config:url("/static/transpect.png")},
+          attribute title {i18n:val('start',$context?lang)}
         }
       },
       element div {
@@ -1272,28 +1287,28 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
         if ($context?subtitle) then element span {attribute class {'date'}, '(' || $context?subtitle || ')'}
       },
       element div {
-      attribute class {'d-flex center'},
-        element ul {
-          for $language in $i18n:languages//language
-          return (
-            element a {
-              attribute href {config:url("/" || $language/xs:string(@short) || $context?url)},
-              element img {
-                attribute class {'lang-img'},
-                attribute src {config:url('/static/' || $language/xs:string(@short) ||'.png')}
+        attribute class {'d-flex center'},
+          element ul {
+            for $language in $i18n:languages//language
+            return (
+              element a {
+                attribute href {config:url("/" || $language/xs:string(@short) || $context?url)},
+                element img {
+                  attribute class {'lang-img'},
+                  attribute src {config:url('/static/' || $language/xs:string(@short) ||'.png')}
+                }
               }
+            )
+          },
+          if (session:get('username'))
+          then 
+            element div {
+              attribute class {'d-flex column'},
+              attribute style {'margin-top: -5px;'},
+              hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?url=' || config:url($context?url)),session:get('username'),'lang-img'),
+              hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
             }
-          )
-        },
-        if (session:get('username'))
-        then 
-          element div {
-            attribute class {'d-flex column'},
-            attribute style {'margin-top: -5px;'},
-            hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?url=' || config:url($context?url)),session:get('username'),'lang-img'),
-            hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
-          }
-        else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
+          else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
       }
     },
     element div {
@@ -1304,12 +1319,14 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
         let $href := string-join($parts[position() le $i + 1],'/'),
             $allowed := ui:can-do($context?username, $href),
             $log := hf:log($context?username || '| ' || $href)
-        return element span {ui:create-anchor($part, config:url(('/' || $context?lang, $href)),(),$allowed)}
+        return element span {ui:create-anchor($context, $part, config:url(('/' || $context?lang, $href)),(),$allowed)}
     }
   }
 }; 
 
 
 declare function ui:can-do($username,$url) {
-  tr:can-do($username,tr:endpoint-right($url))
+  let $can := tr:can-do($username,tr:endpoint-right($url), tr:endpoint-owner($url)),
+      $log := hf:log($url || ' | ' || $username || ': ' || xs:string($can),'CAN')
+  return $can
 };

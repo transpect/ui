@@ -8,7 +8,7 @@
       <allow-bearer-auth>true</allow-bearer-auth>
     </api>
     <controller activated="true">
-      <worker id="gandalf">
+      <worker id="gandalf" name="Gandalf">
         <base-url>http://gandalf:8000</base-url>
       </worker>
     </controller>

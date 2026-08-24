@@ -164,11 +164,11 @@ declare function hf:map-to-xml($map as map(*)){
     else element {$key} {$content ! element line {.}}
 };
 
-declare function hf:create-anchor($href,$text as xs:string? := (), $classes as xs:string* := ()) {
+declare function hf:create-anchor($href,$text as xs:string? := (), $classes as xs:string* := (), $title as xs:string? := ()) {
   element a {
     if ($classes) then attribute class {string-join($classes, ' ')} else (),
     attribute href {$href},
-    attribute title {$text}, 
+    attribute title {($title,$text)[1]}, 
     $text
   }
 };

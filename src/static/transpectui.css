@@ -53,6 +53,9 @@ form-group {
 
 .half {
   width:calc(50% - 25px);
+  &:only-child {
+    width:100%;
+  }
 }
 
 img.lang-img {

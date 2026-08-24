@@ -5,6 +5,7 @@ import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
 
 declare variable $tr:rights-map :=
   map {
+    '^(/[^/]+)?/worker$':'worker:list',
     '^(/[^/]+)?/worker/([^/]+)$':'$2:list',
     '^(/[^/]+)?/worker/([^/]+)/converter$':'$2:list',
     '^(/[^/]+)?/worker/([^/]+)/converter/([^/]+)$':'$2-$3:default',
@@ -14,16 +15,29 @@ declare variable $tr:rights-map :=
     '^(/[^/]+)?/converter/([^/]+)$':'$2:default',
     '^(/[^/]+)?/converter/([^/]+)/runs$':'$2:default',
     '^(/[^/]+)?/converter/([^/]+)/convert$':'$2:convert',
-    '^(/[^/]+)?/user$':'u:mgmt'
+    '^(/[^/]+)?/users$':'u:mgmt',
+    '^(/[^/]+)?/users/([^/]+)$':'u:mgmt'
+  };
+  
+declare variable $tr:owner-map :=
+  map {
+    '^(/[^/]+)?/users/([^/]+)$':'$2'
   };
 
-declare function tr:endpoint-right($url as xs:string?) as xs:string? {
+declare function tr:endpoint-right($url as xs:string?) as xs:string* {
   let $matching :=  
         for $regex in map:keys($tr:rights-map)
         where matches($url, $regex)
         return replace($url,$regex,$tr:rights-map?$regex)
   return $matching
-      
+};
+
+declare function tr:endpoint-owner($url as xs:string?) as xs:string* {
+  let $matching :=  
+        for $regex in map:keys($tr:owner-map)
+        where matches($url, $regex)
+        return replace($url,$regex,$tr:owner-map?$regex)
+  return $matching
 };
 
 declare variable $tr:dynamic-worker-roles :=
@@ -74,6 +88,13 @@ declare function tr:can-do($username as xs:string?, $right as xs:string?, $owner
 
 declare function tr:roles() {
   let $static-roles := u:roles()
-        
   return $static-roles update {insert nodes ($tr:dynamic-roles) into .}
+};
+
+declare function tr:roles-for-right($right as xs:string?) as xs:string* {
+  if (exists($right))
+  then
+    for $role in ($tr:dynamic-roles,u:roles()/role)
+    where (matches($right,$role/right/@matches)[exists($role/right/@matches)] or $role/right/@name[$right eq .])
+    return $role/@name
 };
