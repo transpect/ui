@@ -65,15 +65,16 @@ declare variable $tr:dynamic-local-roles :=
     for $r in (map {'role':'default', 'name': 'convert,default'},map {'role':'runs', 'name': 'conversions'},map {'role':'admin', 'matches': ''})
     return
       element role {
-          attribute name {$c/@worker || '-' || $c/@id || ':' || $r?role},
+          attribute name {$c/@id || ':' || $r?role},
           for $name in tokenize($r?name,',') return 
           element right {
-            attribute name {$c/@worker || '-' || $c/@id || ':' || $name}
+            attribute name {$c/@id || ':' || $name}
           }[map:keys($r) = 'name'],
           element right {
-            attribute matches {$c/@worker || '-' || $c/@id || ':' || $r?name}
+            attribute matches {$c/@id || ':' || $r?name}
           }[map:keys($r) = 'matches']
         };
+        
 declare variable $tr:dynamic-roles := ($tr:dynamic-worker-roles, $tr:dynamic-local-roles);
 
 declare function tr:check($username as xs:string?, $token as xs:string?, $right as xs:string?, $owner as xs:string? := ()) {

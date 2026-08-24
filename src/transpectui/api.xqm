@@ -107,35 +107,32 @@ function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $authed as element(auth):= api:auth($headers),
       $converter := conv:get($converter-id),
       $username := $authed/username,
-      $runs := make:get-local-runs($converter),
+      $runs as element(run)* := make:get-local-runs($converter),
       $user := u:users($username),
       $allowed-runs := 
-        for $runid in map:keys($runs)
-        where make:allowed($username,$runs?$runid)
-        return $runid,
+        for $run in $runs
+        where make:allowed($username,$run)
+        return $run,
       $running-runs :=
-        for $runid in $allowed-runs
-        where xs:boolean($runs?$runid/status eq 'running')
-        return $runid,
+        for $run in $allowed-runs
+        where xs:boolean($run/status eq 'running')
+        return $run,
       $finished-runs :=
-        for $runid in $allowed-runs
-        where not(xs:boolean($runs?$runid/status = ('pending','running')))
-        return $runid,
+        for $run in $allowed-runs
+        where not(xs:boolean($run/status = ('pending','running')))
+        return $run,
       $pending-runs :=
-        for $runid in $allowed-runs
-        where xs:boolean($runs?$runid/status eq 'pending')
-        return $runid,
+        for $run in $allowed-runs
+        where xs:boolean($run/status eq 'pending')
+        return $run,
       $result := (
-        for $runid in $pending-runs
-        let $run as element(run) :=$runs?$runid
+        for $run in $pending-runs
         order by xs:dateTime($run/start) descending
         return $run,
-        for $runid in $running-runs
-        let $run as element(run) :=$runs?$runid
+        for $run in $running-runs
         order by xs:dateTime($run/start) descending
         return $run,
-        for $runid in $finished-runs
-        let $run as element(run) :=$runs?$runid
+        for $run in $finished-runs
         order by xs:dateTime($run/start) descending
         return $run
       )

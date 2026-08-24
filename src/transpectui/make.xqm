@@ -174,32 +174,26 @@ declare function make:get-run($runid as xs:string?) as element(run)? {
   st:get-run($runid)
 }; 
 
-declare function make:get-local-runs($converter as (xs:string|element(converter))? := ()) as map(xs:string, element(run)){
+declare function make:get-local-runs($converter as (xs:string|element(converter))? := ()) as element(run)*{
   if (exists($converter))
   then
     if ($converter instance of xs:string) 
     then
-      map:merge (
-        for $runid in st:list()
-        let $run := st:get-run($runid)
-        where $run/converter/text() eq $converter
-        return $run
-      )
+      for $runid in st:list()
+      let $run := st:get-run($runid)
+      where $run/converter/text() eq $converter
+      return $run
     else
       if (exists($converter/@worker)) 
-      then  map {}
+      then  ()
       else 
-        map:merge ( 
-          for $runid in st:list()
-          let $run := st:get-run($runid)
-          where $run/converter/text() eq $converter/@id
-          return $run
-        )
+        for $runid in st:list()
+        let $run := st:get-run($runid)
+        where $run/converter/text() eq $converter/@id
+        return $run
   else
-    map:merge (
-      for $runid in st:list()
-      return hf:map-to-xml(st:get-run($runid))
-    )
+    for $runid in st:list()
+    return st:get-run($runid)
 };
 
 declare function make:get-output($runid as xs:string) as xs:string{

@@ -396,8 +396,8 @@ function ui:run-info($converter-id as xs:string, $runid as xs:string, $lang as x
   return (
     ui:check('', $lang, $url),
     let $converter as element(converter) := conv:get($converter-id),
-        $run as map(*) := make:get-run($runid),
-        $title as xs:string? := $run?filename,
+        $run as element(run)? := make:get-run($runid),
+        $title as xs:string? := $run/filename,
         $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url, 'refresh': 5}
         
     return ui:build-run-page($converter, $run, $context)
@@ -989,16 +989,18 @@ declare function ui:run-info-display($run as element(run), $converter as element
       $status as xs:string? := $run/status/text(),
       $running-text := i18n:val($status,$context?lang),
       $username as xs:string? := $run/username,
+      $is-worker as xs:boolean := exists($converter/@worker),
+      $worker := xs:string($converter/@worker),
+      
       $logs as element(line)* :=
         if ($context?progress)
         then (
-          if ($converter/@worker)
+          if ($is-worker)
           then worker:get-file-logs($converter,$run)
           else make:get-file-logs($run/file))
         else (),
-      $worker := xs:string($converter/@worker),
       $converter-url := 
-        if (exists($converter/@worker))
+        if ($is-worker)
         then '/' ||$context?lang || '/worker/' || $converter/@worker || '/converter/' || $converter/@id
         else '/' ||$context?lang || '/converter/' || $converter/@id
   return 
@@ -1028,7 +1030,7 @@ declare function ui:run-info-display($run as element(run), $converter as element
       element div {
         attribute class {'run-info username'},
         $worker
-      },
+      }[$is-worker],
       element div {
         attribute class {'run-info cancel'},
         hf:create-anchor(config:url($converter-url || '/runs/' || $runid || '/cancel' || '?url=/' || $context?lang || $context?url), i18n:static-replacement("cancel",$context?lang))
