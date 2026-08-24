@@ -14,27 +14,41 @@ declare variable $api:is-worker := not($config:file/configurations/configuration
 
 declare
   %rest:GET
-  %rest:path("/api/{$lang}")
-  %output:method("xml")
-function api:overview($lang as xs:string){
-  string-join(
-  (
-    'List of supported api-endpoints:',
-    for $fn in inspect:module($ns:api ! replace(.,".* at '|';",''))/function[annotation[@name eq 'rest:path']]
-    let $method := $fn/annotation[matches(@name,'rest:(GET|POST|DELETE|PUT|PATCH|HEAD|OPTIONS|TRACE)')]/replace(@name,'rest:',''),
-	      $path := $fn/annotation[@name eq 'rest:path']/literal/text()
-    return ($method || ': ' || $path)
-  ),'
-')
-}; 
-
-declare
-  %rest:GET
   %rest:path("/api")
   %output:method("xml")
 function api:overview(){
   api:overview('en')
-}; 
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}")
+  %output:method("xml")
+function api:overview($lang as xs:string){
+  string-join(
+    (
+      'List of supported api-endpoints:',
+      for $fn in inspect:module($ns:api ! replace(.,".* at '|';",''))/function[annotation[@name eq 'rest:path']]
+      let $method := $fn/annotation[matches(@name,'rest:(GET|POST|DELETE|PUT|PATCH|HEAD|OPTIONS|TRACE)')]/replace(@name,'rest:',''),
+  	      $path := $fn/annotation[@name eq 'rest:path']/literal/text()
+      return ($method || ': ' || $path)
+    ),'
+  ')
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/status")
+  %output:method("xml")
+function api:get-status($lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username
+  return 
+    if (xs:boolean($authed/@allowed))
+    then api:status()
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
 
 declare
   %rest:GET
@@ -93,7 +107,7 @@ function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $authed as element(auth):= api:auth($headers),
       $converter := conv:get($converter-id),
       $username := $authed/username,
-      $runs := make:get-runs($converter),
+      $runs := make:get-local-runs($converter),
       $user := u:users($username),
       $allowed-runs := 
         for $runid in map:keys($runs)
@@ -135,7 +149,7 @@ declare
   %rest:GET
   %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}")
   %output:method("xml")
-function api:get-converter-runs($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+function api:get-converter-run($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
@@ -155,7 +169,7 @@ function api:get-converter-runs($converter-id as xs:string, $runid as xs:string 
           }
   return 
     if (xs:boolean($authed/@allowed))
-    then element run {attribute runid {$runid}, $run, $result-download-urls}
+    then $run update {insert node $result-download-urls into .}
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -173,6 +187,23 @@ function api:get-converter-run-file-logs($converter-id as xs:string, $runid as x
   return 
     if (xs:boolean($authed/@allowed))
     then element file-log {$file-logs}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/job-messages")
+  %output:method("xml")
+function api:get-converter-run-job-messages($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $run as element(run) := make:get-run($runid),
+      $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $file-logs := for $line in make:store-job-messages($runid) return element line {$line}
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element log-messages {$file-logs}
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -361,6 +392,10 @@ declare %private function api:converter($username as xs:string, $lang as xs:stri
         where api:can-do($conv/@id || ':convert', $username) 
         return $conv
   return $converter
+};
+
+declare %private function api:status() {
+  element status {'running'}
 };
 
 declare %private function api:auth($headers as map(xs:string, xs:string*)?, $allowed-override as xs:boolean? := false()) as element(auth) {

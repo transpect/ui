@@ -16,8 +16,7 @@ form-group {
   }
 }
 .well {
-  margin-left:35px;
-  margin-right:100px;
+  margin-left:10px;
   min-height: 20px;
   padding: 19px;
   margin-bottom: 20px;
@@ -50,6 +49,10 @@ form-group {
     justify-content:space-between;
     flex-direction:column;
   }
+}
+
+.half {
+  width:calc(50% - 25px);
 }
 
 img.lang-img {
@@ -102,6 +105,14 @@ img.header {
 }
 .red {
   color:red;
+}
+.green {
+  color:green;
+}
+
+.disallowed {
+  color:red;
+  text-decoration: underline;
 }
 .filename {
   margin:5px;

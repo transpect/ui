@@ -7,7 +7,6 @@ import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace st = 'http://le-tex.de/store' at 'store.xqm';
 import module namespace queue = 'http://le-tex.de/queue' at 'queue.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
-import module namespace worker = 'http://le-tex.de/worker' at '/opt/basex/webapp/transpectui/worker.xqm';
 import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/transpectui/transpect.xqm';
 
 (: 
@@ -57,7 +56,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       
       $store := st:set('params', $runid, $parameters),
       $start-callback := $ns:store || " declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')",
-      $end-callback := $ns:make || " declare variable $job-id external; make:store-job-messages('" || $runid || "',$job-id)",
+      $end-callback := $ns:make || " declare variable $job-id external; make:store-job-messages('" || $runid || "')",
       $queue-job :=
         queue:register(
           $ns:store || " declare variable $parameters external;
@@ -85,7 +84,7 @@ declare function make:store-job-messages($runid as xs:string){
       $state := if ($job-id) then job:list-details($job-id)/xs:string(@state) else 'not-found',
       $messages := 
         if ($state eq 'cached')
-        then job:result($job-id)/output/text() ! tokenize(.,'\n')
+        then job:result($job-id,map {'keep':true()})[1]/output/text() ! tokenize(.,'\n')
         else st:get('job-results',$runid),
       $store := if ($state eq 'cached')
         then st:set('job-results',$runid, $messages)
@@ -175,7 +174,7 @@ declare function make:get-run($runid as xs:string?) as element(run)? {
   st:get-run($runid)
 }; 
 
-declare function make:get-runs($converter as (xs:string|element(converter))? := ()) as map(xs:string, element(run)){
+declare function make:get-local-runs($converter as (xs:string|element(converter))? := ()) as map(xs:string, element(run)){
   if (exists($converter))
   then
     if ($converter instance of xs:string) 
@@ -184,32 +183,25 @@ declare function make:get-runs($converter as (xs:string|element(converter))? := 
         for $runid in st:list()
         let $run := st:get-run($runid)
         where $run/converter/text() eq $converter
-        return
-          map {$runid: $run}
+        return $run
       )
     else
       if (exists($converter/@worker)) 
-      then 
-        map:merge(
-          for $run in worker:get-runs($converter)
-          let $runid as xs:string := $run/runid
-          return map {$runid: $run}
-        )
+      then  map {}
       else 
         map:merge ( 
           for $runid in st:list()
           let $run := st:get-run($runid)
           where $run/converter/text() eq $converter/@id
-          return
-            map {$runid: $run}
+          return $run
         )
   else
     map:merge (
       for $runid in st:list()
-      return
-        map {$runid: hf:map-to-xml(st:get-run($runid))}
+      return hf:map-to-xml(st:get-run($runid))
     )
 };
+
 declare function make:get-output($runid as xs:string) as xs:string{
   let $converter-id as xs:string := st:get('converter', $runid),
       $converter as element(converter) := conv:get($converter-id),
@@ -244,59 +236,11 @@ declare function make:get-makefile-for-target($converter as element(converter), 
   return $extended//*[target[text() eq $target]]/@location
 };
 
-
 declare function make:empty-run-info($tag, $lang) {
   element div {
     attribute class {'run-info line date'},
     i18n:static-replacement($tag,$lang)
   }
-};
-
-declare function make:run-info-display($run as element(run), $converter as element(converter), $context as map(*)){
-  let $runid as xs:string := $run/runid,
-      $filename:= $run/filename,
-      $start as xs:dateTime := xs:dateTime($run/start),
-      $status as xs:string? := $run/status/text(),
-      $running-text := i18n:static-replacement($status,$context?lang),
-      $username as xs:string? := $run/username,
-      $worker := xs:string($converter/@worker),
-      $converter-url := 
-        if (exists($converter/@worker))
-        then '/' ||$context?lang || '/worker/' || $converter/@worker || '/converter/' || $converter/@id
-        else '/' ||$context?lang || '/converter/' || $converter/@id
-  return 
-    element div {
-      attribute class {'run-info line'},
-      element div {
-        attribute class {'run-info running'},
-        $running-text,
-        hf:create-anchor(config:url($converter-url || '/runs/' || $runid), if ($status eq 'running') then i18n:static-replacement("logs",$context?lang) else i18n:static-replacement("results",$context?lang))
-      },
-      element div {
-        attribute class {'run-info runid'},
-        $runid
-      },
-      element div {
-        attribute class {'run-info starttime'},
-        hf:format-dateTime($start)
-      },
-      element div {
-        attribute class {'run-info file'},
-        $filename
-      },
-      element div {
-        attribute class {'run-info username'},
-        $username
-      },
-      element div {
-        attribute class {'run-info username'},
-        $worker
-      },
-      element div {
-        attribute class {'run-info cancel'},
-        hf:create-anchor(config:url($converter-url || '/runs/' || $runid || '/cancel' || '?url=/' || $context?lang || $context?url), i18n:static-replacement("cancel",$context?lang))
-      }[not($status = ('stopped','canceled'))]
-    }
 };
 
 declare function make:get-file-logs($file) as element(line)*{

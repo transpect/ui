@@ -203,6 +203,22 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Neuen Nutzer anlegen</replacement>
       <replacement lang="en">Create New User</replacement>
     </static-replacement>
+    <static-replacement tag="converters">
+      <replacement lang="de">Konverter</replacement>
+      <replacement lang="en">Converters</replacement>
+    </static-replacement>
+    <static-replacement tag="workers">
+      <replacement lang="de">Worker</replacement>
+      <replacement lang="en">Worker</replacement>
+    </static-replacement>
+    <static-replacement tag="worker">
+      <replacement lang="de">Worker</replacement>
+      <replacement lang="en">Worker</replacement>
+    </static-replacement>
+    <static-replacement tag="on-worker">
+      <replacement lang="de">Auf Worker</replacement>
+      <replacement lang="en">On Worker</replacement>
+    </static-replacement>
     <static-replacement tag="api-tut-get-token">
       <replacement lang="de">Ein TOKEN via /api/de/token/get holen und als Authorization-Header benutzen: -H "Authorization: Bearer TOKEN"</replacement>
       <replacement lang="en">Get a TOKEN via /api/en/token/get and use it as authorization header: -H "Authorization: Bearer TOKEN"</replacement>

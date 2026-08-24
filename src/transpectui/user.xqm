@@ -94,7 +94,7 @@ declare function u:roles-for-user($user as element(user)) as xs:string* {
 declare function u:roles-for-right($right as xs:string?, $dynamic-roles as element(role)* := ()) as xs:string* {
   distinct-values((
     if ($right)
-    then (u:roles()/role, $dynamic-roles)[right/@name eq $right]/xs:string(@name)
+    then (u:roles()/role, $dynamic-roles)[right/@name[. eq $right]]/xs:string(@name)
     else (u:roles()/role, $dynamic-roles)/xs:string(@name),
     
     for $role in (u:roles()/role, $dynamic-roles)
@@ -274,7 +274,7 @@ declare function u:set-password($username, $password) {
   return $add-user/users/user[username eq $username]
 };
 
-declare function u:can-do($user as element(user)?, $right as xs:string, $dynamic-roles as element(role)*, $owner-name as xs:string? := ()) as xs:boolean {
+declare function u:can-do($user as element(user)?, $right as xs:string?, $dynamic-roles as element(role)*, $owner-name as xs:string? := ()) as xs:boolean {
   let $user-roles := $user/roles
   return
     let $matching-roles := 

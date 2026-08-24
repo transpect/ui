@@ -18,6 +18,11 @@ declare function worker:converter($worker as element(worker)? := (), $converter-
     return worker:get-converter($worker)[@id eq $converter-id or not(exists($converter-id))]
 };
 
+declare function worker:get-status($worker as element(worker)) {
+  let $status := worker:get($worker, string-join(('','api','en','status'),'/'))
+  return $status
+};
+
 declare function worker:get-runs($element as (element(converter)|element(worker))) as element(run)*{
   if ($element instance of element(converter))
   then
@@ -28,14 +33,14 @@ declare function worker:get-runs($element as (element(converter)|element(worker)
     return for $id in $converter-ids return worker:get($element, string-join(('','api','en','converter', $id, 'runs'),'/'))[2]/*/run
 };
 
-declare function worker:get-run($element as (element(converter)|element(worker)), $runid) as element(run)? {
+declare function worker:get-run($element as (element(converter)|element(worker)), $runid as xs:string) as element(run)? {
   if ($element instance of element(converter))
   then
-    let $worker := $worker:worker[@id eq $element/@worker]   
-    return worker:get($worker, string-join(('','api','en','converter', $element/@id, 'runs', $runid),'/'))[2]/run/run
+    let $worker := worker:get-by-id($element/@worker)
+    return worker:get($worker, string-join(('','api','en','converter', $element/@id, 'runs', $runid),'/'))[2]/run
   else 
     let $converter-ids := worker:get-converter($element)/@id
-    return for $id in $converter-ids return worker:get($element, string-join(('','api','en','converter', $id, 'runs'),'/'))[2]/run
+    return for $id in $converter-ids return worker:get($element, string-join(('','api','en','converter', $id, 'runs', $runid),'/'))[2]/run
 };
 
 declare function worker:stop-run($converter as element(converter), $runid, $username) {
@@ -43,9 +48,14 @@ declare function worker:stop-run($converter as element(converter), $runid, $user
   return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $runid,'cancel'),'/'),map {'username': $username})[2]
 };
 
-declare function worker:get-file-logs($converter as element(converter), $run) as element(line)* {
+declare function worker:get-file-logs($converter as element(converter), $run as element(run)) as element(line)* {
   let $worker := worker:get-by-id($converter/@worker)
   return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'logs'),'/'))[2]//line
+};
+
+declare function worker:get-job-messages($converter as element(converter), $run as element(run)) as element(line)* {
+  let $worker := worker:get-by-id($converter/@worker)
+  return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'job-messages'),'/'))[2]//line
 };
 
 declare function worker:get-result-files($worker as element(worker), $converter as element(converter), $run as element(run)) as element(file)* {
@@ -103,6 +113,7 @@ declare %private function worker:request($url, $header := (), $body as item()* :
           $url,
           $body
         ),
-      $store := store:put('get',$result)
-  return $result
+      $store := store:put('get',$result),
+      $error-handled := if ($result instance of xs:string) then hf:log($result,'ERROR') else $result
+  return $error-handled
 };
