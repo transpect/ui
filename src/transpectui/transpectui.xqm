@@ -1020,7 +1020,7 @@ declare function ui:run-info-display($run as element(run), $converter as element
       $status as xs:string? := $run/status/text(),
       $running-text := i18n:val($status,$context?lang),
       $username as xs:string? := $run/username,
-      $is-worker as xs:boolean := exists($converter/@worker),
+      $is-worker as xs:boolean := exists($converter/@worker), 
       $worker := xs:string($converter/@worker),
       
       $logs as element(line)* :=
@@ -1030,6 +1030,7 @@ declare function ui:run-info-display($run as element(run), $converter as element
           then worker:get-file-logs($converter,$run)
           else make:get-file-logs($run/file))
         else (),
+      $progress as xs:decimal := if (exists($converter/progress/@max)) then count($logs) div xs:integer($converter/progress/@max) else 0,
       $converter-url := 
         if ($is-worker)
         then '/' ||$context?lang || '/worker/' || $converter/@worker || '/converter/' || $converter/@id
@@ -1039,7 +1040,7 @@ declare function ui:run-info-display($run as element(run), $converter as element
       attribute class {'run-info line'},
       element div {
         attribute class {'run-info running'},
-        $running-text || (' (' || count($logs) || '/' || ($converter/progress/@max,0)[1] || ')')[xs:boolean($context?progress)],
+        $running-text || (' (' || format-number($progress,'1%') || ')')[xs:boolean($context?progress)],
         hf:create-anchor(config:url($converter-url || '/runs/' || $runid), if ($status eq 'running') then i18n:static-replacement("logs",$context?lang) else i18n:static-replacement("results",$context?lang))
       },
       element div {
