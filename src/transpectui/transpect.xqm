@@ -16,7 +16,11 @@ declare variable $tr:rights-map :=
     '^(/[^/]+)?/converter/([^/]+)/runs$':'$2:default',
     '^(/[^/]+)?/converter/([^/]+)/convert$':'$2:convert',
     '^(/[^/]+)?/users$':'u:mgmt',
-    '^(/[^/]+)?/users/([^/]+)$':'u:mgmt'
+    '^(/[^/]+)?/users/([^/]+)$':'u:mgmt',
+    '^(/[^/]+)?/users/([^/]+)/delete$':'u:mgmt',
+    '^(/[^/]+)?/users/([^/]+)/roles/([^/]+)/add$':'u:mgmt',
+    '^(/[^/]+)?/users/([^/]+)/roles/([^/]+)/remove$':'u:mgmt',
+    '^(/[^/]+)?/users/([^/]+)/sessions/([^/]+)$':'u:mgmt'
   };
   
 declare variable $tr:owner-map :=

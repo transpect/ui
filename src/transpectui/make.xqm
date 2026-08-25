@@ -153,21 +153,21 @@ declare function make:list-runs() as xs:string*{
   st:list()
 };
 
-declare function make:allowed($username as xs:string*, $run as element(run)){
-  let $converter-id := $run/converter/text(),
-      $username := $run/username/text()
-  return 
-      (tr:can-do($username,$converter-id || ':runs')
-   or ($username eq $username))
-   or (
-      let $my-groups := u:groups($username),
-          $run-groups :=
-            if ($username)
-            then u:groups($username)
-            else (),
-          $group-matches := $my-groups = $run-groups
-      return count($group-matches) gt 0
-   )
+declare function make:allowed($converter as element(converter), $caller as xs:string*, $run as element(run)){
+  let $converter-id as xs:string? := $converter/@id,
+      $worker as xs:string? := $converter/@worker,
+      $username := $run/username/text(),
+      $same-group := 
+        let $my-groups := u:groups($caller),
+            $run-groups :=
+              if ($username)
+              then u:groups($username)
+              else (),
+            $group-matches := $my-groups[. = $run-groups]
+        return count($group-matches) gt 0,
+     $owner := $username eq $caller,
+     $can-do := tr:can-do($caller,($worker || '-')[$worker] || $converter-id || ':runs') 
+  return ($same-group or $owner or  $can-do)
 };
 
 declare function make:get-run($runid as xs:string?) as element(run)? {

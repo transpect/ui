@@ -111,7 +111,7 @@ function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $user := u:users($username),
       $allowed-runs := 
         for $run in $runs
-        where make:allowed($username,$run)
+        where make:allowed($converter, $username,$run)
         return $run,
       $running-runs :=
         for $run in $allowed-runs

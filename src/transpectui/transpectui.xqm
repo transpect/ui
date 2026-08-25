@@ -7,10 +7,11 @@ import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
 import module namespace tr = 'http://le-tex.de/transpect' at 'transpect.xqm';
+import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
 
 declare function ui:check($right as xs:string?, $lang as xs:string, $return-url as xs:string?, $owner as xs:string? := ()){
   let $is-logged-in := exists(ui:access-session('username')),
-      $is-allowed := ui:check-only($right, $owner)
+      $is-allowed := if (exists($right)) then ui:check-only($right, $owner) else true()
   return
     if ($is-logged-in)
     then if ($is-allowed)
@@ -23,7 +24,7 @@ declare function ui:check-only($right as xs:string?, $owner as xs:string? := ())
   let $username := ui:access-session('username'),
       $token := ui:access-session('token'),
       $is-allowed := tr:check($username, $token, $right) or ($owner eq $username),
-      $log := hf:log($right || ': ' || ui:access-session('username') || '(' || $owner || ') => ' || $is-allowed,'CHECK')
+      $log := hf:log('r: ' || $right || ' u: ' || ui:access-session('username') || ' o: ' || $owner || ' a: ' || $is-allowed,'CHECK')
   return $is-allowed
 };
 
@@ -48,9 +49,9 @@ function ui:default($lang) {
       $converters as element(converter)* := (conv:get-all()),
       $worker-converters as element(converter)* := (worker:converter()),
       $url := '/',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url,'username':$username}
   return (
-    ui:check('', $lang, $url),
+    ui:check((), $lang, $url),
     let $content := (
           element div {
             attribute class {'well'},
@@ -289,6 +290,7 @@ function ui:worker-run-info($worker-id as xs:string, $converter-id as xs:string,
 
 declare
   %rest:GET
+  %ui:exclude
   %rest:query-param("url", "{$return-url}")
   %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/cancel")
 function ui:stop-worker-run-frontend($worker-id, $converter-id, $runid, $lang, $return-url){
@@ -407,6 +409,7 @@ function ui:run-info($converter-id as xs:string, $runid as xs:string, $lang as x
 
 declare
   %rest:GET
+  %ui:exclude
   %rest:query-param("url", "{$return-url}")
   %rest:path("/{$lang}/converter/{$converter-id}/runs/{$runid}/cancel")
 function ui:stop-run-frontend($runid, $lang, $converter-id, $return-url){
@@ -452,7 +455,7 @@ function ui:show($lang, $converter-id, $runid, $filename) {
     return if ($show-direct) then $data else web:error('415','Das Dokument kann nicht angezeigt werden.')
   else web:error(403, 'You are not allowed to access this file.')
 };
-
+(:
 declare
   %rest:GET
   %rest:path("/runs/{$runid}/{$filename}/action/{$action-name}")
@@ -468,7 +471,7 @@ function ui:post-conversion-action($runid, $filename, $action-name as xs:string)
         else 'No action specified'
   return $start
 };
-
+:)
 declare 
   %rest:GET
   %rest:path("/{$lang}/converter/{$converter-id}/error/{$error-message}")
@@ -568,6 +571,7 @@ function ui:do-login($lang as xs:string, $url as xs:string?, $username as xs:str
 
 declare
   %rest:GET
+  %ui:exclude
   %rest:path("/{$lang}/error")
   %rest:query-param("url", "{$return-url}")
   %rest:query-param("message", "{$message}")
@@ -598,21 +602,21 @@ function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $messa
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/users/{$username-to-update}/roles/add/{$role}")
+  %rest:path("/{$lang}/users/{$username-to-update}/roles/{$role}/add")
   %rest:query-param("url","{$return-url}")
   %output:method("html")
   %output:html-version('5')
 function ui:user-add-role($lang as xs:string, $username-to-update as xs:string, $role as xs:string, $return-url as xs:string?){
   let $right := 'u:mgmt',
       $can-do := ui:check-only($right, $lang),
-      $log := hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','CHECK'),
+      $log := hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','ROLES'),
       $do-update := if ($can-do) then u:add-role($username-to-update, $role) else ()
   return web:redirect(config:url('/' || $lang || $return-url))
 };
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/users/{$username-to-update}/roles/remove/{$role}")
+  %rest:path("/{$lang}/users/{$username-to-update}/roles/{$role}/remove")
   %rest:query-param("url","{$return-url}")
   %output:method("html")
   %output:html-version('5')
@@ -705,12 +709,12 @@ function ui:user($lang, $username-to-update, $return-url){
             if ($has-role)
             then (
               element span{ attribute class {'date'},'[' || i18n:val('add',$lang) || ']'},
-              ui:create-anchor($context, '[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/remove/' || $name || '?url=' || $url)
+              ui:create-anchor($context, '[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/remove?url=' || $url)
             )
             else
               if (ui:check-only('u:mgmt'))
               then (
-                ui:create-anchor($context, '[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/add/' || $name || '?url=' || $url),
+                ui:create-anchor($context, '[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/add?url=' || $url),
                 element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
               ),
             element span {' - ' || $name},
@@ -760,6 +764,22 @@ function ui:user($lang, $username-to-update, $return-url){
             }
           }
         }
+      },
+      element div {
+        attribute class {'well'},
+        element details {
+          element summary {'All Links'},
+          let $full := ui:build-full-map($username-to-update,$lang)
+          return
+            for $k in map:keys($full)
+            return
+              element details {
+                element summary {$k},
+                for $a in $full?$k
+                return
+                  element a { attribute class {'d-block'}, attribute href {$a},$a}
+              }
+        }
       }
     ),())
   )
@@ -767,20 +787,21 @@ function ui:user($lang, $username-to-update, $return-url){
 
 declare
   %rest:GET
-  %rest:path("/{$lang}/users/{$username-to-delete}/delete")
+  %rest:path("/{$lang}/users/{$username-to-update}/delete")
   %rest:query-param("url","{$return-url}")
   %output:method("html")
   %output:html-version('5')
-function ui:user-new($lang,$username-to-delete, $return-url){
+function ui:user-new($lang,$username-to-update, $return-url){
   let $right := 'u:mgmt',
-      $can-do := ui:check-only($right,$username-to-delete),
-      $do-update := if ($can-do) then u:delete-user($username-to-delete) else (),
-      $log := if ($can-do) then hf:log('delete user: ' ||$username-to-delete)
+      $can-do := ui:check-only($right,$username-to-update),
+      $do-update := if ($can-do) then u:delete-user($username-to-update) else (),
+      $log := if ($can-do) then hf:log('delete user: ' ||$username-to-update)
   return web:redirect(config:url('/' || $lang ||$return-url))
 };
 
 declare
   %rest:GET
+  %ui:exclude
   %rest:path("/{$lang}/users/{$username-to-update}/sessions/{$id}/close")
   %rest:query-param("url","{$return-url}")
   %output:method("html")
@@ -802,7 +823,8 @@ function ui:user-management($lang){
   let $title := 'TranspectUI User Management',
       $url := '/users',
       $right := tr:endpoint-right($url),
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': '/converter'}
+      $username := ui:access-session('username'),
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': '/converter','username':$username}
   return
     (ui:check($right, $lang, $url),
     element html {
@@ -923,7 +945,7 @@ declare function ui:build-runs-page($converter as element(converter), $context a
   let $runs as element(run)* := ui:get-runs($converter),
       $allowed-runs := 
         for $run in $runs
-        where make:allowed($context?username,$run)
+        where make:allowed($converter, $context?username,$run)
         return $run,
       $running-runs :=
         for $run in $allowed-runs
@@ -1052,7 +1074,7 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
                           case 'stopped' return '✔️'
                           default return '-',
         $title as xs:string? := $run/filename,
-        $is-allowed as xs:boolean := make:allowed(ui:access-session('username'),$run),
+        $is-allowed as xs:boolean := make:allowed($converter, ui:access-session('username'),$run),
         $start as xs:dateTime := xs:dateTime($run/start),
         $end as xs:dateTime? := if (exists($run/end)) then xs:dateTime($run/end) else (),
         $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run/start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
@@ -1176,6 +1198,7 @@ declare function ui:build-converter-page($converter as element(converter), $cont
         },
         element div {
           attribute class {'well'},
+          element h2 {i18n:val('new-conversion',$context?lang)},
           element form {
             attribute action {config:url('/' || $context?lang || $context?url || '/convert')},
             attribute method {'POST'},
@@ -1331,6 +1354,110 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
 
 declare function ui:can-do($username,$url) {
   let $can := tr:can-do($username,tr:endpoint-right($url), tr:endpoint-owner($url)),
-      $log := hf:log($url || ' | ' || $username || ': ' || xs:string($can),'CAN')
+      $log := hf:log('u: ' || $url || ' u: ' || $username || ' c: ' || xs:string($can),'CAN')
   return $can
+};
+
+declare function ui:build-full-map($username as xs:string, $lang as xs:string) as map(*){
+  let $worker-converter := worker:converter(),  
+      $user := u:users($username),
+      $get-paths := inspect:module($ns:ui ! replace(.,".* at '|';",''))/*[annotation[@name eq 'rest:GET']][not(annotation[@name eq 'ui:exclude'])]/annotation[@name eq 'rest:path']/literal/text(),
+      $roles := ($tr:dynamic-roles,u:roles()/role),
+      $worker-paths := $get-paths[matches(.,'\$worker-id')],
+      $non-worker-paths := $get-paths[not(matches(.,'\$worker-id'))][matches(.,'\$converter-id')],
+      $username-paths := $get-paths[not(matches(.,'\$worker-id|\$converter-id'))][matches(.,'\$username-to-update')],
+      $rest := $get-paths[not(matches(.,'\$worker-id|\$converter-id|\$username-to-update'))],
+      $rest-map := map {'lang':$lang},
+      $rest-merged := 
+        for $url in $rest
+        return
+          let $n-url := hf:static-replace-variables($url,$rest-map,"") ! replace(.,'\{|\}',''),
+              $right := tr:endpoint-right($n-url),
+              $allowed as xs:boolean := (($user/roles/role/xs:string(@name) = tr:roles-for-right($right)) or not(exists($right)))
+          order by $n-url
+          where $allowed
+          return hf:static-replace-variables($n-url,$rest-map),
+      $username-maps := 
+        for $u in u:users()/user
+        return
+          for $r in $roles/xs:string(@name)
+          return
+            map {'username-to-update':$u/username/text(),
+                 'role':$r,
+                 'lang':$lang},
+      $username-merged := 
+        for $url in $username-paths
+        return
+          for $m in $username-maps
+          let $n-url := hf:static-replace-variables($url,$m,"") ! replace(.,'\{|\}',''),
+              $right := tr:endpoint-right($n-url),
+              $owner := tr:endpoint-owner($n-url),
+              $allowed as xs:boolean := (($user/roles/role/xs:string(@name) = tr:roles-for-right($right)) or not(exists($right))) or $owner eq $username
+          order by $n-url
+          where $allowed
+          return hf:static-replace-variables($n-url,$m),
+      $non-worker-maps := 
+        for $c in conv:get-all()
+        let $runs := ui:get-runs($c)
+        return
+          for $r in $runs
+          let $files as xs:string* := make:get-result-files($r)/@name
+          return
+            for $f in $files
+            return
+              map {
+                'runid':$r/runid/text(),
+                'allowed':make:allowed($c, $username,$r),
+                'filename': $f,
+                'lang':$lang
+              },
+      $non-worker-merged := 
+        for $url in $non-worker-paths
+        return
+          for $m in $non-worker-maps
+          let $n-url := hf:static-replace-variables($url,$m,"") ! replace(.,'\{|\}',''),
+              $right := tr:endpoint-right($n-url),
+              $allowed as xs:boolean := (($user/roles/role/xs:string(@name) = tr:roles-for-right($right)) or not(exists($right))) and $m?allowed
+          order by $n-url
+          where $allowed
+          return hf:static-replace-variables($n-url,$m),
+      $worker-maps := (), (:
+        for $c in $worker-converter
+        let $w := worker:get-by-id($c/@worker),
+            $runs := ui:get-runs($c)
+        return
+          for $r in $runs
+          let $files as xs:string*:= worker:get-result-files($w,$c,$r)/@name
+          return
+            for $f in $files
+            return 
+              map {
+                'worker-id':xs:string($c/@worker),
+                'converter-id':xs:string($c/@id),
+                'runid':$r/runid/text(),
+                'allowed':make:allowed($c,$username,$r),
+                'filename':$f,
+                'lang':$lang
+              },:)
+      $worker-merged := ()(:
+        for $url in $worker-paths
+        return
+          for $m in $worker-maps
+          let $n-url := hf:static-replace-variables($url,$m,"") ! replace(.,'\{|\}',''),
+              $right := tr:endpoint-right($n-url),
+              $allowed as xs:boolean := (($user/roles/role/xs:string(@name) = tr:roles-for-right($right)) or not(exists($right))) and $m?allowed
+          order by $n-url
+          where $allowed
+          return hf:static-replace-variables($n-url,$m):)
+  return 
+    map {
+      'default': distinct-values($rest-merged),
+      'user': distinct-values($username-merged),
+      'worker': distinct-values($worker-merged),
+      'local': distinct-values($non-worker-merged)
+    }
+};
+
+declare function ui:create-sub-struct($current, $subs,$urls){
+  ()
 };

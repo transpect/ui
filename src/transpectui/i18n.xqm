@@ -147,6 +147,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Beendete Konvertierungen</replacement>
       <replacement lang="en">Finished Conversions</replacement>
     </static-replacement>
+    <static-replacement tag="new-conversion">
+      <replacement lang="de">Neue Konvertierung starten</replacement>
+      <replacement lang="en">Start New Conversion</replacement>
+    </static-replacement>
     <static-replacement tag="empty-pending">
       <replacement lang="de">Keine Konvertierungen in der Warteschlange</replacement>
       <replacement lang="en">No Pending Conversions</replacement>
