@@ -167,6 +167,9 @@ input:required {
 details > div{
   margin-left: 25px;
 }
+.stacked{
+  margin-left: 25px;
+}
 
 .date {
   color:grey;

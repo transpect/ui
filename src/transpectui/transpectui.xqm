@@ -321,6 +321,7 @@ function ui:worker-download($lang as xs:string, $worker-id as xs:string, $conver
 
 declare
   %rest:GET
+  %ui:exclude
   %rest:path("/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/show/{$filename}")
   %output:method("html")
   %output:html-version('5')
@@ -609,7 +610,7 @@ declare
 function ui:user-add-role($lang as xs:string, $username-to-update as xs:string, $role as xs:string, $return-url as xs:string?){
   let $right := 'u:mgmt',
       $can-do := ui:check-only($right, $lang),
-      $log := hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','ROLES'),
+      $log := if ($can-do) then hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','ROLES') else (),
       $do-update := if ($can-do) then u:add-role($username-to-update, $role) else ()
   return web:redirect(config:url('/' || $lang || $return-url))
 };
@@ -623,6 +624,7 @@ declare
 function ui:user-remove-role($lang, $username-to-update, $role, $return-url){
   let $right := 'u:mgmt',
       $can-do := ui:check-only($right, $username-to-update),
+      $log := if ($can-do) then hf:log('removing role ' || $role || ' from ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','ROLES') else (),
       $do-update := if ($can-do) then u:delete-role($username-to-update, $role) else ()
   return web:redirect(config:url('/' || $lang || $return-url))
 };
@@ -772,13 +774,17 @@ function ui:user($lang, $username-to-update, $return-url){
           let $full := ui:build-full-map($username-to-update,$lang)
           return
             for $k in map:keys($full)
+            let $val := $full?$k 
             return
-              element details {
-                element summary {$k},
-                for $a in $full?$k
-                return
-                  element a { attribute class {'d-block'}, attribute href {$a},$a}
-              }
+              if (exists($val))
+              then
+                element details {
+                  attribute class {'stacked'},
+                  element summary {$k},
+                  $val
+                }
+              else
+                element span {attribute class {'d-block stacked'}, $k}
         }
       }
     ),())
@@ -1407,6 +1413,7 @@ declare function ui:build-full-map($username as xs:string, $lang as xs:string) a
             return
               map {
                 'runid':$r/runid/text(),
+                'converter-id':xs:string($c/@id),
                 'allowed':make:allowed($c, $username,$r),
                 'filename': $f,
                 'lang':$lang
@@ -1421,7 +1428,7 @@ declare function ui:build-full-map($username as xs:string, $lang as xs:string) a
           order by $n-url
           where $allowed
           return hf:static-replace-variables($n-url,$m),
-      $worker-maps := (), (:
+      $worker-maps :=
         for $c in $worker-converter
         let $w := worker:get-by-id($c/@worker),
             $runs := ui:get-runs($c)
@@ -1438,8 +1445,8 @@ declare function ui:build-full-map($username as xs:string, $lang as xs:string) a
                 'allowed':make:allowed($c,$username,$r),
                 'filename':$f,
                 'lang':$lang
-              },:)
-      $worker-merged := ()(:
+              },
+      $worker-merged := 
         for $url in $worker-paths
         return
           for $m in $worker-maps
@@ -1448,14 +1455,56 @@ declare function ui:build-full-map($username as xs:string, $lang as xs:string) a
               $allowed as xs:boolean := (($user/roles/role/xs:string(@name) = tr:roles-for-right($right)) or not(exists($right))) and $m?allowed
           order by $n-url
           where $allowed
-          return hf:static-replace-variables($n-url,$m):)
+          return hf:static-replace-variables($n-url,$m)
   return 
     map {
-      'default': distinct-values($rest-merged),
-      'user': distinct-values($username-merged),
-      'worker': distinct-values($worker-merged),
-      'local': distinct-values($non-worker-merged)
+      'default': ui:list-to-xml(distinct-values($rest-merged)),
+      'user': ui:list-to-xml(distinct-values($username-merged)),
+      'worker': ui:list-to-xml(distinct-values($worker-merged)),
+      'local': ui:list-to-xml(distinct-values($non-worker-merged))
     }
+};
+
+declare function ui:list-to-xml($urls) {
+  let $subs :=
+        distinct-values(
+          for $url in $urls
+          let $tokens := tokenize($url,'/'),
+              $subs := for $l in (1 to count($tokens)) return string-join($tokens[1 to $l],'/')
+          return $subs
+        )
+  return ui:list-to-xml('',$subs,$urls)
+};
+
+declare function ui:list-to-xml($current, $subs, $urls){
+  let $children := $subs[matches(.,'^' || $current || '/[^/]+$')],
+      $url-children := $children[. = $urls]
+  return
+    if (((count($url-children) gt 0) or ($current = $urls)) and normalize-space($current) ne '')
+    then 
+      if ($current = $urls) then 
+        if (count($children) gt 0)
+        then
+          element details {
+            attribute class {'stacked'},
+            element summary {
+              element a {attribute href {$current},$current}
+            },
+            for $c in $children
+            return ui:list-to-xml($c,$subs,$urls)
+          }
+        else
+          element a {attribute class {'stacked d-block'}, attribute href {$current},$current}
+      else
+        element details {
+          attribute class {'stacked'},
+          attribute open {},
+          element summary {tokenize($current,'/')[last()]},
+          for $c in $children
+          return ui:list-to-xml($c,$subs,$urls)
+        }
+    else for $c in $children
+      return ui:list-to-xml($c,$subs,$urls)
 };
 
 declare function ui:create-sub-struct($current, $subs,$urls){
