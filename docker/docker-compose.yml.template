@@ -6,11 +6,23 @@ services:
     volumes:
       - ../src/transpectui:/opt/basex/webapp/transpectui
       - ../src/static:/opt/basex/webapp/static
-      - ../code:/opt/code
-      - ../data:/opt/data
       - ../scripts:/opt/scripts
     ports:
      - "8083:8000"
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "5m"
+  worker1:
+    image: transpectui_brepols:latest
+    container_name: Gandalf
+    volumes:
+      - ../src/static:/opt/basex/webapp/static
+      - ../data/gandalf:/opt/data
+      - ../code:/opt/code
+      - ../scripts:/opt/scripts
+    ports:
+     - "8084:8000"
     logging:
         driver: "json-file"
         options:

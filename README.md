@@ -34,7 +34,7 @@ BaseX based UI for transpect converters. Currently uses BaseX 11.
 - Create Converter Frontend Docker Images via `/scripts/buildImages.sh`. The name if the image will be `transpectui`.
 
 ##### Define Services
-- Add a service to the `docker/docker-compose.yml` (Check docker/docker-compose.yml.example for examples)
+- Add a service to the `docker/docker-compose.yml` (Check docker/docker-compose.yml.template for examples)
 
 ##### Launch
 - Lauch the environment `docker compose create && docker compose start` inside `/docker` directory.
