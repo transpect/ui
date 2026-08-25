@@ -2,6 +2,10 @@ body {
   font-family: "Calibri","Lucida Grande",sans-serif;
 }
 
+.d-block {
+  display:block;
+}
+
 form-group {
   display:block;
   margin:15px;
