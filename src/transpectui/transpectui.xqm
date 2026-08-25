@@ -398,7 +398,8 @@ function ui:run-info($converter-id as xs:string, $runid as xs:string, $lang as x
     let $converter as element(converter) := conv:get($converter-id),
         $run as element(run)? := make:get-run($runid),
         $title as xs:string? := $run/filename,
-        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url, 'refresh': 5}
+        $username := ui:access-session('username'),
+        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url, 'username': $username}
         
     return ui:build-run-page($converter, $run, $context)
     )
@@ -561,7 +562,7 @@ function ui:do-login($lang as xs:string, $url as xs:string?, $username as xs:str
       ui:access-session('token', $token/self::token/text()),
       ui:access-session('timestamp', current-dateTime()),
       ui:access-session('username', $username),
-      if ($url) then web:redirect($url) else web:redirect('/')
+      if ($url and $url ne '/login') then web:redirect($url) else web:redirect('/')
     )
 };
 
@@ -935,7 +936,8 @@ declare function ui:build-runs-page($converter as element(converter), $context a
       $pending-runs :=
         for $run in $allowed-runs
         where xs:boolean($run/status/text() eq 'pending')
-        return $run
+        return $run,
+      $context := map:merge(($context, map {'refresh': 5}))
   return
     element html {
       ui:get-html-head($context),
