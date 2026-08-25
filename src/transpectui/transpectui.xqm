@@ -108,7 +108,7 @@ function ui:converter-list($lang as xs:string){
               attribute class {'well'},
               for $converter in ($converters)
               let $allowed := ui:check-only($converter/@worker || '-' || $converter/@id || ':convert')
-              return ui:create-anchor($context, $converter/xs:string(@name), config:url(string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/')), 'block', $allowed)
+              return ui:create-anchor($context, $converter/xs:string(@name), string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/'), 'block', $allowed)
             },
           $description := ''
       return ui:page($context,$content,$description)
@@ -145,7 +145,7 @@ function ui:worker-list($lang as xs:string){
               return
               element div {
                 attribute class {''},
-                ui:create-anchor($context, xs:string($worker/@name),config:url('/' || $lang || $url), (),$allowed),
+                ui:create-anchor($context, xs:string($worker/@name),'/' || $lang || $url, (),$allowed),
                 element span {
                   attribute class {if ($status eq 'running') then 'green' else 'red'},
                   attribute title {i18n:val($status,$lang)},
@@ -181,7 +181,7 @@ function ui:worker-page($worker-id as xs:string, $lang as xs:string){
           let $url := '/worker/' || $converter/@worker || '/converter/' || $converter/@id,
               $allowed := ui:can-do($username, $url)
           return
-            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url('/' || $lang || $url), 'block', $allowed)
+            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), '/' || $lang || $url, 'block', $allowed)
         }
       }
     }
@@ -212,7 +212,7 @@ function ui:worker-converter-list($worker-id as xs:string, $lang as xs:string){
           let $url := '/worker/' || $converter/@worker || '/converter/' || $converter/@id,
               $allowed := ui:can-do($username, $url)
           return
-            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), config:url('/' || $lang || $url), 'block', $allowed)
+            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), '/' || $lang || $url, 'block', $allowed)
         }
       }
     }
@@ -475,6 +475,7 @@ function ui:post-conversion-action($runid, $filename, $action-name as xs:string)
 :)
 declare 
   %rest:GET
+  %ui:exclude
   %rest:path("/{$lang}/converter/{$converter-id}/error/{$error-message}")
   %output:method("html")
   %output:html-version('5')
@@ -594,7 +595,7 @@ function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $messa
             $message
           },
           element div {
-            ui:create-anchor($context, i18n:val('back',$lang), config:url($return-url))
+            ui:create-anchor($context, i18n:val('back',$lang), $return-url)
           }
         }
       }
@@ -1198,7 +1199,7 @@ declare function ui:build-converter-page($converter as element(converter), $cont
           ui:create-anchor(
             $context, 
             i18n:val('prev-conversions',$context?lang),
-            config:url('/' || $context?lang || $context?url || '/runs'),(),
+            '/' || $context?lang || $context?url || '/runs',(),
             ui:can-do($context?username, $context?url || '/runs')
           )
         },
@@ -1352,7 +1353,7 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
         let $href := string-join($parts[position() le $i + 1],'/'),
             $allowed := ui:can-do($context?username, $href),
             $log := hf:log($context?username || '| ' || $href)
-        return element span {ui:create-anchor($context, $part, config:url(('/' || $context?lang, $href)),(),$allowed)}
+        return element span {ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)}
     }
   }
 }; 
@@ -1488,13 +1489,13 @@ declare function ui:list-to-xml($current, $subs, $urls){
           element details {
             attribute class {'stacked'},
             element summary {
-              element a {attribute href {$current},$current}
+              element a {attribute href {$current},config:url($current)}
             },
             for $c in $children
             return ui:list-to-xml($c,$subs,$urls)
           }
         else
-          element a {attribute class {'stacked d-block'}, attribute href {$current},$current}
+          element a {attribute class {'stacked d-block'}, attribute href {$current},config:url($current)}
       else
         element details {
           attribute class {'stacked'},
@@ -1505,8 +1506,4 @@ declare function ui:list-to-xml($current, $subs, $urls){
         }
     else for $c in $children
       return ui:list-to-xml($c,$subs,$urls)
-};
-
-declare function ui:create-sub-struct($current, $subs,$urls){
-  ()
 };
