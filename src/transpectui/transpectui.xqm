@@ -1040,7 +1040,7 @@ declare function ui:run-info-display($run as element(run), $converter as element
       attribute class {'run-info line'},
       element div {
         attribute class {'run-info running'},
-        $running-text || (' (' || format-number($progress,'1%') || ')')[xs:boolean($context?progress)],
+        $running-text || (' (' || format-number($progress,'1%') || ')')[xs:boolean($context?progress) and exists($converter/progress/@max)],
         hf:create-anchor(config:url($converter-url || '/runs/' || $runid), if ($status eq 'running') then i18n:static-replacement("logs",$context?lang) else i18n:static-replacement("results",$context?lang))
       },
       element div {

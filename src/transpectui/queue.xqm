@@ -9,8 +9,7 @@ import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/
  
 declare variable $queue:key := "waiting-queue";
 declare variable $queue:running-key := "running-queue";
-declare variable $queue:max := 3;
-declare variable $queue:max-age := 0;
+declare variable $queue:max as xs:integer := ($config:file/configurations/configuration/queue/xs:integer(@max),3)[1];
 
 declare function queue:register($job-query as xs:string, $job-parameter as map(*)? := {}, $job-options as map(*)? := {}, $start-callback := (), $end-callback := ()) {
   let $job-map := map {
