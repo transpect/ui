@@ -49,7 +49,7 @@ function ui:default($lang) {
       $converters as element(converter)* := (conv:get-all()),
       $worker-converters as element(converter)* := (worker:converter()),
       $url := '/',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url,'username':$username}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url,'username':$username}
   return (
     ui:check((), $lang, $url),
     let $content := (
@@ -99,7 +99,7 @@ function ui:converter-list($lang as xs:string){
       $header := request:header-map(),
       $converters as element(converter)* := (conv:get-all()),
       $url := '/converter',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url}
   return
     (
       ui:check($right, $lang, $url),
@@ -130,7 +130,7 @@ function ui:worker-list($lang as xs:string){
       $url := '/worker',
       $username := ui:access-session('username'),
       $right := tr:endpoint-right($url),
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url':$url, 'username':$username}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
   return
     (
       ui:check($right, $lang, $url),
@@ -168,7 +168,7 @@ function ui:worker-page($worker-id as xs:string, $lang as xs:string){
       $right := tr:endpoint-right($url),
       $title := i18n:val('worker',$lang) || ' ' || $worker-id,
       $username := ui:access-session('username'),
-      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url, 'username':$username}
+      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
   return (
     ui:check($right, $lang, $url),
     element html {
@@ -199,7 +199,7 @@ function ui:worker-converter-list($worker-id as xs:string, $lang as xs:string){
       $right := tr:endpoint-right($url),
       $title := i18n:val('converter', $lang) || ' (' || i18n:val('on-worker',$lang) || ' ' || $worker-id ||  ')',
       $username := ui:access-session('username'),
-      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url}
+      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url}
   return (
     ui:check($right, $lang, $url),
     element html {
@@ -230,7 +230,7 @@ function ui:worker-converter-page($worker-id as xs:string, $converter-id as xs:s
       $right := tr:endpoint-right($url),
       $username := ui:access-session('username'),
       $title := $converter/xs:string(@name) || ' (' || i18n:val('on-worker',$lang) || ' '  || $worker-id ||  ')',
-      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url, 'username': $username}
+      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username': $username}
   return if (exists($converter)) then ui:build-converter-page($converter, $context) else web:redirect(config:url('/' || $lang || '/converter'))
 };
 
@@ -264,7 +264,7 @@ function ui:get-worker-converter-runs($worker-id as xs:string, $converter-id as 
       $url := '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs',
       $right := tr:endpoint-right($url),
       $return-url := '/worker/' || $worker-id || '/converter/' || $converter-id,
-      $context := map {'title': $title, 'lang': $lang, 'return-url':$return-url, 'url':$url, 'right':$right, 'username': $username}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'right':$right, 'username': $username}
   return ui:build-runs-page($converter, $context)
 };
 
@@ -282,7 +282,7 @@ function ui:worker-run-info($worker-id as xs:string, $converter-id as xs:string,
         $run as element(run) := worker:get-run($converter,$runid),
         $title as xs:string? := $run/filename,
         $username := ui:access-session('username'),
-        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url,'username':$username}
+        $context := map {'lang': $lang, 'title': $title, 'url': $url,'username':$username}
         
     return ui:build-run-page($converter, $run, $context, $worker)
     )
@@ -352,7 +352,7 @@ function ui:converter-page($converter-id as xs:string, $lang as xs:string){
       $right := tr:endpoint-right($url),
       $title := $converter/xs:string(@name),
       $username := ui:access-session('username'),
-      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'return-url':'/converter/', 'url':$url, 'username':$username}
+      $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
   return if (exists($converter)) then ui:build-converter-page($converter, $context) else web:redirect(config:url('/' || $lang || '/converter'))
 };
 
@@ -369,7 +369,7 @@ function ui:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $url := '/converter/' || $converter-id || '/runs',
       $return-url := '/converter/' || $converter-id,
       $right := tr:endpoint-right($url),
-      $context := map {'title': $title, 'lang': $lang, 'return-url':$return-url, 'url':'/converter/'|| $converter-id || '/runs', 'right':$right, 'username': $username}
+      $context := map {'title': $title, 'lang': $lang, 'url':'/converter/'|| $converter-id || '/runs', 'right':$right, 'username': $username}
   return ui:build-runs-page($converter, $context)
 };
 
@@ -402,7 +402,7 @@ function ui:run-info($converter-id as xs:string, $runid as xs:string, $lang as x
         $run as element(run)? := make:get-run($runid),
         $title as xs:string? := $run/filename,
         $username := ui:access-session('username'),
-        $context := map {'lang': $lang, 'title': $title, 'return-url': '/converter/' || $converter-id, 'url': $url, 'username': $username}
+        $context := map {'lang': $lang, 'title': $title, 'url': $url, 'username': $username}
         
     return ui:build-run-page($converter, $run, $context)
     )
@@ -482,7 +482,7 @@ declare
 function ui:error($error-message, $converter-id, $lang) {
   let $converter := conv:get($converter-id),
       $title := $converter/xs:string(@name),
-      $context := map {'title': $title, 'lang': $lang, 'url':'/converter/' || $converter-id || '/error/' || $error-message, 'return-url':'/converter/' || $converter-id}
+      $context := map {'title': $title, 'lang': $lang, 'url':'/converter/' || $converter-id || '/error/' || $error-message}
   return
     element html {
         ui:get-html-head($context),
@@ -506,7 +506,7 @@ declare
 function ui:login-frontend($lang as xs:string, $return-url as xs:string?, $message as xs:string?){
   let $title := 'TranspectUI Login',
       $url := '/login',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': ($return-url, $url)[1]}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url}
   return
     element html {
       ui:get-html-head($context),
@@ -582,7 +582,7 @@ declare
 function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $message as xs:string?){
   let $title := 'TranspectUI Error',
       $url := '/error',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': $return-url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url}
   return
     element html {
       ui:get-html-head($context),
@@ -605,45 +605,48 @@ function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $messa
 declare
   %rest:GET
   %rest:path("/{$lang}/users/{$username-to-update}/roles/{$role}/add")
-  %rest:query-param("url","{$return-url}")
+  %rest:query-param("url","{$url}")
+  %rest:query-param("return-url","{$return-url}")
   %output:method("html")
   %output:html-version('5')
-function ui:user-add-role($lang as xs:string, $username-to-update as xs:string, $role as xs:string, $return-url as xs:string?){
+function ui:user-add-role($lang as xs:string, $username-to-update as xs:string, $role as xs:string, $return-url as xs:string?, $url as xs:string?){
   let $right := 'u:mgmt',
       $can-do := ui:check-only($right, $lang),
       $log := if ($can-do) then hf:log('adding role ' || $role || ' to ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','ROLES') else (),
       $do-update := if ($can-do) then u:add-role($username-to-update, $role) else ()
-  return web:redirect(config:url('/' || $lang || $return-url))
+  return web:redirect(config:url('/' || $lang || $url  || ('?return-url=' || $return-url)[$return-url]))
 };
 
 declare
   %rest:GET
   %rest:path("/{$lang}/users/{$username-to-update}/roles/{$role}/remove")
-  %rest:query-param("url","{$return-url}")
+  %rest:query-param("url","{$url}")
+  %rest:query-param("return-url","{$return-url}")
   %output:method("html")
   %output:html-version('5')
-function ui:user-remove-role($lang, $username-to-update, $role, $return-url){
+function ui:user-remove-role($lang, $username-to-update, $role, $return-url, $url){
   let $right := 'u:mgmt',
       $can-do := ui:check-only($right, $username-to-update),
       $log := if ($can-do) then hf:log('removing role ' || $role || ' from ' || $username-to-update || ' by ' || ui:access-session('username') || '(' || $can-do || ')','ROLES') else (),
       $do-update := if ($can-do) then u:delete-role($username-to-update, $role) else ()
-  return web:redirect(config:url('/' || $lang || $return-url))
+  return web:redirect(config:url('/' || $lang || $url  || ('?return-url=' || $return-url)[$return-url]))
 };
 
 declare
   %rest:POST
   %rest:path("/{$lang}/users/{$username-to-update}/password/reset")
-  %rest:query-param("url","{$return-url}")
+  %rest:query-param("url","{$url}")
+  %rest:query-param("return-url","{$return-url}")
   %rest:form-param("new-password","{$new-password}")
   %rest:form-param("old-password","{$old-password}")
   %output:method("html")
   %output:html-version('5')
-function ui:user-reset-password($lang, $username-to-update, $old-password, $new-password, $return-url){
+function ui:user-reset-password($lang, $username-to-update, $old-password, $new-password, $url, $return-url){
   let $right := 'u:mgmt',
       $can-do := ui:check($right, $lang, $return-url, $username-to-update),
       $old-pw-correct := u:validate-password(ui:access-session('username'),$old-password),
       $do-update := if ($can-do and $old-pw-correct) then u:set-password($username-to-update, $new-password) else ()
-  return web:redirect(config:url('/' || $lang ||$return-url))
+  return web:redirect(config:url('/' || $lang ||$url  || ('?return-url=' || $return-url)[$return-url]))
 };
 
 declare
@@ -665,7 +668,7 @@ function ui:user-new($lang,$username-to-create,$password, $return-url){
 declare
   %rest:GET
   %rest:path("/{$lang}/users/{$username-to-update}")
-  %rest:query-param("url","{$return-url}")
+  %rest:query-param("return-url","{$return-url}")
   %output:method("html")
   %output:html-version('5')
 function ui:user($lang, $username-to-update, $return-url){
@@ -679,7 +682,7 @@ function ui:user($lang, $username-to-update, $return-url){
       $right := tr:endpoint-right($url),
       $owner := tr:endpoint-owner($url),
       $user-roles := u:roles-for-username($username-to-update),
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': ($return-url,'/converter/')[1], 'username': $username}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'username': $username, 'return-url':$return-url}
   return (
     ui:check($right, $lang, $url, $username-to-update),
     ui:page($context,(
@@ -697,7 +700,7 @@ function ui:user($lang, $username-to-update, $return-url){
                 element div {
                   element span {$name || ':' || sessions:get($id, $name)}
                 },
-              ui:create-anchor($context, 'Session löschen','/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url)
+              ui:create-anchor($context, 'Session löschen','/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url])
               }
           }
       },
@@ -712,12 +715,12 @@ function ui:user($lang, $username-to-update, $return-url){
             if ($has-role)
             then (
               element span{ attribute class {'date'},'[' || i18n:val('add',$lang) || ']'},
-              ui:create-anchor($context, '[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/remove?url=' || $url)
+              ui:create-anchor($context, '[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/remove?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url])
             )
             else
               if (ui:check-only('u:mgmt'))
               then (
-                ui:create-anchor($context, '[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/add?url=' || $url),
+                ui:create-anchor($context, '[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/add?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url]),
                 element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
               ),
             element span {' - ' || $name},
@@ -732,7 +735,7 @@ function ui:user($lang, $username-to-update, $return-url){
           attribute class {'form-group'},
           element form {
             attribute method {'POST'},
-            attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url},
+            attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url]},
             attribute class {},
             element form-group {
               attribute class {'form-group'},
@@ -831,7 +834,7 @@ function ui:user-management($lang){
       $url := '/users',
       $right := tr:endpoint-right($url),
       $username := ui:access-session('username'),
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'return-url': '/converter','username':$username}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url,'username':$username}
   return
     (ui:check($right, $lang, $url),
     element html {
@@ -1340,21 +1343,43 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
             element div {
               attribute class {'d-flex column'},
               attribute style {'margin-top: -5px;'},
-              hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?url=' || config:url($context?url)),session:get('username'),'lang-img'),
+              hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?return-url=' || config:url($context?url)),session:get('username'),'lang-img right'),
               hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
             }
           else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
       }
     },
     element div {
-      attribute class {'breadcrumbs'},
-      let $parts := $context?url => tokenize('/')
-      return 
-        for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
-        let $href := string-join($parts[position() le $i + 1],'/'),
+      attribute class {'d-flex start'},
+      let $bc := ($context?url => tokenize('/'))[normalize-space(.)]
+      return if ((count($bc) gt 1) and ($context?url ne '/login'))
+      then (
+        element div {
+          attribute class {'breadcrumbs'},
+          let $parts := $context?url => tokenize('/')
+          return 
+            for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
+            let $href := string-join($parts[position() le $i + 1],'/'),
+                $allowed := ui:can-do($context?username, $href),
+                $log := hf:log($context?username || '| ' || $href)
+            return element span {ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)}
+        },
+        element span { '|'}
+        )
+      else (),
+      element div {
+        attribute class {'nav'},
+        element span {'Navigation: '},
+        let $href := '',
             $allowed := ui:can-do($context?username, $href),
             $log := hf:log($context?username || '| ' || $href)
-        return element span {ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)}
+        return element span {ui:create-anchor($context, i18n:val('start',$context?lang), '/' || $context?lang || $href,(),$allowed)},
+        if (exists($context?return-url))
+        then (
+          element span {', '},
+          element span {ui:create-anchor($context, i18n:val('back',$context?lang), '/' || $context?lang || $context?return-url,(),true())})
+        
+      }
     }
   }
 }; 
