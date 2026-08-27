@@ -4,7 +4,6 @@ import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
 import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
 import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
 import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
-import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/transpectui/transpect.xqm';
 import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
@@ -93,7 +92,7 @@ function api:convert($file as map(xs:string, xs:base64Binary), $converter-id as 
       $converter := conv:get($converter-id),
       $run as (element(error)|element(run)) :=
         if ($is-allowed)
-        then make:start-target-run('conversion', $converter, $text-params, $file, $username)
+        then tr:start-run($file, $text-params, $converter, $username)
         else element error {i18n:val('not-allowed-message',$lang)}
   return $run
 };
@@ -107,11 +106,11 @@ function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $authed as element(auth):= api:auth($headers),
       $converter := conv:get($converter-id),
       $username := $authed/username,
-      $runs as element(run)* := make:get-local-runs($converter),
+      $runs as element(run)* := tr:get-local-runs($converter),
       $user := u:users($username),
       $allowed-runs := 
         for $run in $runs
-        where make:allowed($converter, $username,$run)
+        where tr:allowed($converter, $username,$run)
         return $run,
       $running-runs :=
         for $run in $allowed-runs
@@ -150,7 +149,7 @@ function api:get-converter-run($converter-id as xs:string, $runid as xs:string ,
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $run as element(run) := make:get-run($runid),
+      $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $result-files :=
         for $file in file:list($out-path)
@@ -178,9 +177,10 @@ function api:get-converter-run-file-logs($converter-id as xs:string, $runid as x
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $run as element(run) := make:get-run($runid),
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
+      $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $file-logs := make:get-file-logs($run/file)
+      $file-logs := tr:get-file-logs($run, $converter)
   return 
     if (xs:boolean($authed/@allowed))
     then element file-log {$file-logs}
@@ -195,9 +195,9 @@ function api:get-converter-run-job-messages($converter-id as xs:string, $runid a
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $run as element(run) := make:get-run($runid),
+      $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $file-logs := for $line in make:store-job-messages($runid) return element line {$line}
+      $file-logs := for $line in tr:get-job-messages($run) return element line {$line}
   return 
     if (xs:boolean($authed/@allowed))
     then element log-messages {$file-logs}
@@ -212,9 +212,9 @@ function api:get-converter-run-file-results($converter-id as xs:string, $runid a
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $run as element(run) := make:get-run($runid),
+      $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $files := make:get-result-files($run)
+      $files := tr:get-result-files($run)
   return 
     if (xs:boolean($authed/@allowed))
     then element result-files {$files}
@@ -229,7 +229,9 @@ function api:get-converter-stop-run($converter-id as xs:string, $runid as xs:str
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
-      $stop := make:stop-run($runid)
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
+      $run as element(run)? := tr:get-run($runid, $converter),
+      $stop := tr:stop-run($run, $username)
   return 
     if (xs:boolean($authed/@allowed))
     then element result{$stop}
@@ -241,7 +243,7 @@ declare
   %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/download/{$filename}")
 function api:get-converter-runs-download($converter-id as xs:string, $runid as xs:string ,$lang as xs:string, $filename as xs:string){
 
-  let $run as element(run) := make:get-run($runid),
+  let $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
       $filepath := $out-path || $filename,
       $filesize := file:size($filepath),

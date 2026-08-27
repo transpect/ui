@@ -1,5 +1,6 @@
 module namespace tr  = 'http://le-tex.de/transpect';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
+import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
 import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
 
@@ -103,3 +104,123 @@ declare function tr:roles-for-right($right as xs:string?) as xs:string* {
     where (matches($right,$role/right/@matches)[exists($role/right/@matches)] or $role/right/@name[$right eq .])
     return $role/@name
 };
+
+declare function tr:get-runs($converter as element(converter)) {
+  if ($converter instance of xs:string) 
+  then make:get-local-runs($converter)
+  else
+    if (exists($converter/@worker)) 
+    then worker:get-runs(worker:get-by-id($converter/@worker))
+    else make:get-local-runs($converter)
+};
+
+declare function tr:get-run($runid as xs:string, $converter as element(converter)? := (), $worker as element(worker)? := ()) as element(run)? {
+  if (exists($worker))
+  then worker:get-run($converter,$runid)
+  else make:get-run($runid)
+};
+
+declare function tr:start-run($file as map(xs:string, xs:base64Binary), $text-params as map(*)?, $converter as element(converter)?, $username as xs:string, $worker as element(worker)? := ()) {
+  if (exists($worker))
+  then
+    worker:convert($worker, $converter, $file, $text-params, $username)
+  else
+    make:start-target-run('conversion', $converter, $text-params, $file, $username) 
+};
+
+declare function tr:stop-run($run as element(run), $username as xs:string? := 'admin', $converter as element(converter)? := (), $worker as element(worker)? := ()) {
+  if (exists($worker))
+  then worker:stop-run($worker, $converter, $run, $username)
+  else make:stop-run($run)
+};
+
+declare function tr:get-file-logs($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) as element(line)* {
+  if (exists($worker))
+  then worker:get-file-logs($worker, $converter,$run)
+  else make:get-file-logs($run/file)
+};
+
+declare function tr:get-result-files($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) as element(file)* {
+  if (exists($worker))
+  then worker:get-result-files($worker, $converter, $run)
+  else make:get-result-files($run)
+};
+
+declare function tr:get-file($run as element(run), $filename as xs:string,  $converter as element(converter), $worker as element(worker)? := ()) as xs:base64Binary {
+  if (exists($worker))
+  then worker:get-file($worker, $converter, $run, $filename)
+  else make:get-file($run, $filename)
+};
+
+declare function tr:get-job-messages($run as element(run), $converter as element(converter), $worker as element(worker)?) as element(line)* {
+  if (exists($worker))
+  then worker:get-job-messages($worker, $converter, $run)
+  else make:store-job-messages($run)
+};
+
+declare function tr:allowed($converter as element(converter), $caller as xs:string*, $run as element(run)){
+  let $converter-id as xs:string? := $converter/@id,
+      $worker as xs:string? := $converter/@worker,
+      $username := $run/username/text(),
+      $same-group := 
+        let $my-groups := u:groups($caller),
+            $run-groups :=
+              if ($username)
+              then u:groups($username)
+              else (),
+            $group-matches := $my-groups[. = $run-groups]
+        return count($group-matches) gt 0,
+     $owner := $username eq $caller,
+     $can-do := tr:can-do($caller,($worker || '-')[$worker] || $converter-id || ':runs') 
+  return ($same-group or $owner or  $can-do)
+};
+declare function tr:get-runs($converter as element(converter), $username as xs:string) as element(runs) {
+    let $runs as element(run)* := tr:get-runs($converter),
+        $allowed-runs := 
+          for $run in $runs
+          where tr:allowed($converter, $username,$run)
+          return $run,
+        $running-runs :=
+          for $run in $allowed-runs
+          where xs:boolean($run/status/text() eq 'running')
+          return $run,
+        $finished-runs :=
+          for $run in $allowed-runs
+          where not(xs:boolean($run/status/text() = ('pending','running')))
+          return $run,
+        $pending-runs :=
+          for $run in $allowed-runs
+          where xs:boolean($run/status/text() eq 'pending')
+          return $run
+  return
+    element runs {
+      element pending {
+        $pending-runs
+      },element running {
+        $running-runs
+      },element finished {
+        $finished-runs
+      }
+    }
+};
+
+declare function tr:get-worker($worker-id as xs:string? := ()) as element(worker)* {
+  if (exists($worker-id))
+    then worker:get-by-id($worker-id)
+    else $worker:worker
+};
+
+declare function tr:get-worker-status($worker as element(worker)) as xs:string? {
+  worker:get-status($worker)
+};
+
+declare function tr:get-worker-converter($worker-id as xs:string? := (), $converter-id as xs:string? := ()) as element(converter)* {
+  worker:converter(worker:get-by-id($worker-id),$converter-id)
+};
+
+declare function tr:get-local-converter($converter-id as xs:string? := ()) as element(converter)* {
+  if (exists($converter-id))
+  then conv:get($converter-id)
+  else conv:get-all()
+};
+

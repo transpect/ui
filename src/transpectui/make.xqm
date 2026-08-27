@@ -79,8 +79,9 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
          }
 };
 
-declare function make:store-job-messages($runid as xs:string){
-  let $job-id := st:get('job-id',$runid),
+declare function make:store-job-messages($run as element(run)){
+  let $runid := $run/runid/text(),
+      $job-id := st:get('job-id',$runid),
       $state := if ($job-id) then job:list-details($job-id)/xs:string(@state) else 'not-found',
       $messages := 
         if ($state eq 'cached')
@@ -117,9 +118,8 @@ declare function make:build-target-dir($converter as element(converter), $filena
   return $config:data-dir-base || '/' || $converter-id || '/' || $filename || '_' || $suffix || '/' 
 };
 
-declare function make:stop-run($runid) {
-  let $run := (st:get-run($runid),{})[1],
-      $status := $run/status/text()
+declare function make:stop-run($run) {
+  let $status := $run/status/text()
   return
     switch ($status)
     case 'running' return make:stop-running-run($run)
@@ -151,23 +151,6 @@ declare function make:get-converter($runid) as element(converter)?{
 
 declare function make:list-runs() as xs:string*{
   st:list()
-};
-
-declare function make:allowed($converter as element(converter), $caller as xs:string*, $run as element(run)){
-  let $converter-id as xs:string? := $converter/@id,
-      $worker as xs:string? := $converter/@worker,
-      $username := $run/username/text(),
-      $same-group := 
-        let $my-groups := u:groups($caller),
-            $run-groups :=
-              if ($username)
-              then u:groups($username)
-              else (),
-            $group-matches := $my-groups[. = $run-groups]
-        return count($group-matches) gt 0,
-     $owner := $username eq $caller,
-     $can-do := tr:can-do($caller,($worker || '-')[$worker] || $converter-id || ':runs') 
-  return ($same-group or $owner or  $can-do)
 };
 
 declare function make:get-run($runid as xs:string?) as element(run)? {
@@ -230,13 +213,6 @@ declare function make:get-makefile-for-target($converter as element(converter), 
   return $extended//*[target[text() eq $target]]/@location
 };
 
-declare function make:empty-run-info($tag, $lang) {
-  element div {
-    attribute class {'run-info line date'},
-    i18n:static-replacement($tag,$lang)
-  }
-};
-
 declare function make:get-file-logs($file) as element(line)*{
   let $log-dir := (($file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
       $logs :=
@@ -249,6 +225,13 @@ declare function make:get-file-logs($file) as element(line)*{
           return element line {attribute time {$mod-by}, file:read-text($log-dir || '/' ||$file)}
         else ()
   return $logs
+};
+
+declare function make:get-file($run as element(run), $filename as xs:string) as xs:base64Binary {
+  let $outpath := $run?params[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $filepath := $outpath || $filename,
+      $data := file:read-binary($filepath)
+  return $data
 };
 
 declare function make:get-result-files($run as element(run)) as element(file)* {

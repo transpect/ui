@@ -43,19 +43,16 @@ declare function worker:get-run($element as (element(converter)|element(worker))
     return for $id in $converter-ids return worker:get($element, string-join(('','api','en','converter', $id, 'runs', $runid),'/'))[2]/run
 };
 
-declare function worker:stop-run($converter as element(converter), $runid, $username) {
-  let $worker := worker:get-by-id($converter/@worker)
-  return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $runid,'cancel'),'/'),map {'username': $username})[2]
+declare function worker:stop-run($worker as element(worker), $converter as element(converter), $run as element(run), $username as xs:string) {
+  worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'cancel'),'/'),map {'username': $username})[2]
 };
 
-declare function worker:get-file-logs($converter as element(converter), $run as element(run)) as element(line)* {
-  let $worker := worker:get-by-id($converter/@worker)
-  return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'logs'),'/'))[2]//line
+declare function worker:get-file-logs($worker as element(worker), $converter as element(converter), $run as element(run)) as element(line)* {
+  worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'logs'),'/'))[2]//line
 };
 
-declare function worker:get-job-messages($converter as element(converter), $run as element(run)) as element(line)* {
-  let $worker := worker:get-by-id($converter/@worker)
-  return worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'job-messages'),'/'))[2]//line
+declare function worker:get-job-messages($worker as element(worker), $converter as element(converter), $run as element(run)) as element(line)* {
+  worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'job-messages'),'/'))[2]//line
 };
 
 declare function worker:get-result-files($worker as element(worker), $converter as element(converter), $run as element(run)) as element(file)* {
@@ -77,7 +74,7 @@ declare function worker:get($worker as element(worker), $url as xs:string, $head
   return $result
 };
 
-declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string? := 'transpectui') as element(run)?{
+declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $text-params, $username as xs:string? := 'transpectui') as element(run)?{
   worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username)[2]/run
 };
 
@@ -94,7 +91,7 @@ declare function worker:post($worker as element(worker), $url as xs:string, $fil
 return $result
 };
 
-declare function worker:get-by-id($worker-id as xs:string?){
+declare function worker:get-by-id($worker-id as xs:string?) as element(worker)? {
   hf:log($worker-id,'W-ID'),
   $worker:worker[@id eq $worker-id]
 };
