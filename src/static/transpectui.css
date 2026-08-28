@@ -50,20 +50,34 @@ form-group {
   }
 }
 
-@media (max-width: 800px) {
-  .d-flex {
-    display:flex;
-    justify-content:space-between;
-    flex-direction:column;
-  }
-}
-
 .half {
   width:calc(50% - 25px);
   &:only-child {
     width:100%;
   }
 }
+
+.center {
+  align-items: center;
+}
+.gap {
+  gap:12px;
+}
+
+@media (max-width: 1024px) {
+  .d-flex {
+    display:flex;
+    justify-content:space-between;
+    flex-direction:column;
+  }
+  .half {
+    width: 100%;
+  }
+  .desktop-only {
+    display:none;
+  }
+}
+
 
 img.lang-img {
   width: 20px;
@@ -177,11 +191,6 @@ details > div{
 .date {
   color:grey;
 }
-.center {
-  align-items: center;
-  gap: 12px;
-}
-
 div.content-log {
   margin:5px;
 }
@@ -197,6 +206,7 @@ div.content-log {
   text-align:right;
   color:grey;
   margin-right:10px;
+  min-width:145px;
   &::after{
     content:':'
   }

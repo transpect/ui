@@ -44,8 +44,8 @@ function ui:default($lang) {
   let $title := 'TranspectUI',
       $header := request:header-map(),
       $username := ui:access-session('username'),
-      $converters as element(converter)* := (conv:get-all()),
-      $worker-converters as element(converter)* := tr:get-worker-converter(),
+      $converters as element(converter)* := tr:get-local-converter(),
+      $workers as element(worker)* := tr:get-worker(),
       $url := '/',
       $context := map {'title': $title, 'lang': $lang, 'url':$url,'username':$username}
   return (
@@ -53,18 +53,24 @@ function ui:default($lang) {
     let $content := (
           element div {
             attribute class {'well'},
-            element h3 {i18n:val('converters',$lang)},
+            element h2 {i18n:val('converters',$lang)},
             for $c in $converters
             let $allowed := ui:can-do($username,$url || 'converter/' || $c/@id)
             return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/converter/' || $c/@id,(),$allowed)
           }[count($converters) gt 0 ],
           element div {
             attribute class {'well'},
-            element h3 {i18n:val('workers',$lang)},
-            for $c in $worker-converters
-            let $allowed := ui:can-do($username,$url || '/worker/' || $c/@worker || '/converter/' || $c/@id)
-            return ui:create-anchor($context, xs:string($c/@name) || ' (' || $c/@worker || ')','/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,(),$allowed)
-          }[count($worker-converters) gt 0 ]),
+            element h2 {i18n:val('workers',$lang)},
+            for $w in $workers
+            let $cs as element(converter)? := tr:get-worker-converter($w)
+            return
+              (
+                element h3 {xs:string($w/@name)},
+                for $c in $cs
+                let $allowed := ui:can-do($username,$url || '/worker/' || $c/@worker || '/converter/' || $c/@id)
+                return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,(),$allowed)
+              )
+          }[count($workers) gt 0 ]),
         $description := 
           element div {
             attribute class {'well'},
@@ -194,7 +200,7 @@ function ui:worker-converter-list($worker-id as xs:string, $lang as xs:string){
       $converters as element(converter)* := tr:get-worker-converter($worker),
       $url := string-join(('','worker', $worker-id, 'converter'),'/'),
       $right := tr:endpoint-right($url),
-      $title := i18n:val('converter', $lang) || ' (' || i18n:val('on-worker',$lang) || ' ' || $worker-id ||  ')',
+      $title := i18n:val('converter', $lang) || ' (' || i18n:val('on-worker',$lang) || ' ' || $worker/@name ||  ')',
       $username := ui:access-session('username'),
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url}
   return (
@@ -224,7 +230,7 @@ function ui:worker-converter-page($worker-id as xs:string, $converter-id as xs:s
       $url := string-join(('','worker', $worker-id, 'converter', $converter-id),'/'),
       $right := tr:endpoint-right($url),
       $username := ui:access-session('username'),
-      $title := $converter/xs:string(@name) || ' (' || i18n:val('on-worker',$lang) || ' '  || $worker-id ||  ')',
+      $title := $converter/xs:string(@name) || ' (' || i18n:val('on-worker',$lang) || ' '  || $worker/@name ||  ')',
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username': $username}
   return if (exists($converter)) then ui:build-converter-page($converter, $context) else web:redirect(config:url('/' || $lang || '/converter'))
 };
@@ -470,7 +476,7 @@ declare
 function ui:login-frontend($lang as xs:string, $return-url as xs:string?, $message as xs:string?){
   let $title := 'TranspectUI Login',
       $url := '/login',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'hide-login':true()}
   return
     ui:page(
       $context,
@@ -1259,12 +1265,12 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
         }
       },
       element div {
-        attribute class {'d-flex center'},
-        element h1 {$context?title},
-        if ($context?subtitle) then element span {attribute class {'date'}, '(' || $context?subtitle || ')'}
+        attribute class {'d-flex column center'},
+        element h1 {attribute style {'margin-bottom: 0;'},$context?title},
+        if ($context?subtitle) then element span {attribute class {'date'}, $context?subtitle}
       },
       element div {
-        attribute class {'d-flex center'},
+        attribute class {'d-flex center gap'},
           element ul {
             for $language in $i18n:languages//language
             return (
@@ -1285,7 +1291,7 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
               hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?return-url=' || config:url($context?url)),session:get('username'),'lang-img right'),
               hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
             }
-          else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
+          else if (not($context?hide-login)) then hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
       }
     },
     element div {
@@ -1305,7 +1311,7 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
       let $bc := ($context?url => tokenize('/'))[normalize-space(.)]
       return if ((count($bc) gt 1) and ($context?url ne '/login'))
       then (
-        element span { '|'},
+        element span { attribute class {'desktop-only'}, '|'},
         element div {
           attribute class {'breadcrumbs'},
           let $parts := ($context?url => tokenize('/'))[position() ne last()]
