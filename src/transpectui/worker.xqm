@@ -57,12 +57,12 @@ declare function worker:get-job-messages($worker as element(worker), $converter 
 
 declare function worker:get-result-files($worker as element(worker), $converter as element(converter), $run as element(run)) as element(file)* {
   let $files := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'files'),'/'))[2]//file
-  return $files/file
+  return $files
 };
 
 declare function worker:get-file($worker as element(worker), $converter as element(converter), $run as element(run), $filename as xs:string) as xs:base64Binary {
-  let $files := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'download', $filename),'/'),map {},(),'application/octet-stream')[2]
-  return $files
+  let $file := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'download', $filename),'/'),map {},(),'application/octet-stream')[2]
+  return $file
 };
 
 declare %private function worker:get-converter($worker as element(worker)) {

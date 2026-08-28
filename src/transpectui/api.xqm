@@ -566,8 +566,7 @@ declare %private function api:status() {
 declare %private function api:auth($headers as map(xs:string, xs:string*)?, $allowed-override as xs:boolean? := false()) as element(auth) {
   if ($api:is-worker)
   then
-    let $username := $headers?username otherwise 'not-found',
-        $log := for $k in map:keys($headers) return hf:log($k || ':' || $headers?$k,'H')
+    let $username := $headers?username otherwise 'not-found'
     return
       element auth {
         attribute allowed {true()},
