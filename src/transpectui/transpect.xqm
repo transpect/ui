@@ -105,14 +105,6 @@ declare function tr:roles-for-right($right as xs:string?) as xs:string* {
     return $role/@name
 };
 
-declare function tr:get-runs($converter as element(converter)) {
-  if ($converter instance of xs:string) 
-  then make:get-local-runs($converter)
-  else
-    if (exists($converter/@worker)) 
-    then worker:get-runs(worker:get-by-id($converter/@worker))
-    else make:get-local-runs($converter)
-};
 
 declare function tr:get-run($runid as xs:string, $converter as element(converter)? := (), $worker as element(worker)? := ()) as element(run)? {
   if (exists($worker))
@@ -152,13 +144,13 @@ declare function tr:get-file($run as element(run), $filename as xs:string,  $con
   else make:get-file($run, $filename)
 };
 
-declare function tr:get-job-messages($run as element(run), $converter as element(converter), $worker as element(worker)?) as element(line)* {
+declare function tr:get-job-messages($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) as element(line)* {
   if (exists($worker))
   then worker:get-job-messages($worker, $converter, $run)
   else make:store-job-messages($run)
 };
 
-declare function tr:allowed($converter as element(converter), $caller as xs:string*, $run as element(run)){
+declare function tr:allowed($converter as element(converter), $caller as xs:string?, $run as element(run)){
   let $converter-id as xs:string? := $converter/@id,
       $worker as xs:string? := $converter/@worker,
       $username := $run/username/text(),
@@ -174,7 +166,19 @@ declare function tr:allowed($converter as element(converter), $caller as xs:stri
      $can-do := tr:can-do($caller,($worker || '-')[$worker] || $converter-id || ':runs') 
   return ($same-group or $owner or  $can-do)
 };
+
+declare function tr:get-runs($converter as element(converter)) as element(run)*  {
+  admin:write-log('select runs for ' || $converter/@id ,'RUNS'),
+  if ($converter instance of xs:string)
+  then make:get-local-runs($converter)
+  else
+    if (exists($converter/@worker))
+    then worker:get-runs(worker:get-by-id($converter/@worker))
+    else make:get-local-runs($converter)
+};
+
 declare function tr:get-runs($converter as element(converter), $username as xs:string) as element(runs) {
+admin:write-log('select runs for ' || $converter/@id || ', ' || $username ,'RUNS'),
     let $runs as element(run)* := tr:get-runs($converter),
         $allowed-runs := 
           for $run in $runs

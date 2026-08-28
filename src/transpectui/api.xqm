@@ -9,7 +9,7 @@ import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/
 import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
 
 declare variable $api:config := $config:file/configurations/configuration/api;
-declare variable $api:is-worker := not($config:file/configurations/configuration/controller/activated eq "true"); (: ALL Calls are allowed:)
+declare variable $api:is-worker := not($config:file/configurations/configuration/controller/@activated eq "true"); (: ALL Calls are allowed:)
 
 declare
   %rest:GET
@@ -56,10 +56,11 @@ declare
 function api:get-converters($lang as xs:string){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed := api:auth($headers),
-      $username := $authed/username
+      $username := $authed/username,
+      $converter as element(converter)* := api:converter($username, $lang)
   return 
     if (xs:boolean($authed/@allowed))
-    then api:converter($username, $lang)
+    then $converter
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -70,10 +71,11 @@ declare
 function api:get-converter($converter-id as xs:string, $lang as xs:string){
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
-      $username := $authed/username
+      $username := $authed/username,
+      $converter as element(converter)? := api:converter($converter-id, $username, $lang)
   return 
     if (xs:boolean($authed/@allowed))
-    then api:converter($username, $converter-id, $lang)
+    then $converter
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -89,7 +91,7 @@ function api:convert($file as map(xs:string, xs:base64Binary), $converter-id as 
       $text-params := map:remove(request:parameter-map(),('file','file')),
       $right := $converter-id || ':convert',
       $is-allowed := (api:can-do($right, $username) and xs:boolean($authed/@allowed)),
-      $converter := conv:get($converter-id),
+      $converter as element(converter)? := api:converter($converter-id, $username, $lang),
       $run as (element(error)|element(run)) :=
         if ($is-allowed)
         then tr:start-run($file, $text-params, $converter, $username)
@@ -106,38 +108,11 @@ function api:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $authed as element(auth):= api:auth($headers),
       $converter := conv:get($converter-id),
       $username := $authed/username,
-      $runs as element(run)* := tr:get-local-runs($converter),
-      $user := u:users($username),
-      $allowed-runs := 
-        for $run in $runs
-        where tr:allowed($converter, $username,$run)
-        return $run,
-      $running-runs :=
-        for $run in $allowed-runs
-        where xs:boolean($run/status eq 'running')
-        return $run,
-      $finished-runs :=
-        for $run in $allowed-runs
-        where not(xs:boolean($run/status = ('pending','running')))
-        return $run,
-      $pending-runs :=
-        for $run in $allowed-runs
-        where xs:boolean($run/status eq 'pending')
-        return $run,
-      $result := (
-        for $run in $pending-runs
-        order by xs:dateTime($run/start) descending
-        return $run,
-        for $run in $running-runs
-        order by xs:dateTime($run/start) descending
-        return $run,
-        for $run in $finished-runs
-        order by xs:dateTime($run/start) descending
-        return $run
-      )
+      $runs as element(runs) := if ($username ne 'not-found') then tr:get-runs($converter,$username) else element runs {tr:get-runs($converter)},
+      $user := u:users($username)
   return 
     if (xs:boolean($authed/@allowed))
-    then element runs {$result}
+    then $runs
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -149,23 +124,13 @@ function api:get-converter-run($converter-id as xs:string, $runid as xs:string ,
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
       $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $result-files :=
-        for $file in file:list($out-path)
-        where not(matches($file,'/$')) and not(matches($file, '\.pid$|\.stdout$'))
-        return {'name': normalize-space($file), 'path': $out-path || normalize-space($file)},
-      $result-download-urls := 
-        for $file in $result-files
-        let $extention := ($file?name => tokenize('[\./]'))[last()]
-        return
-          element result-files {
-            attribute name {($file?name => tokenize('/'))[last()]},
-            attribute href {config:url('/api/' || $lang || '/converter/' || $converter-id ||'/runs/' || $runid || '/download/' || $file?name)}
-          }
+      $result-files := tr:get-result-files($run, $converter)
   return 
     if (xs:boolean($authed/@allowed))
-    then $run update {insert node $result-download-urls into .}
+    then $run update {insert node $result-files into .}
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -195,9 +160,10 @@ function api:get-converter-run-job-messages($converter-id as xs:string, $runid a
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
       $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $file-logs := for $line in tr:get-job-messages($run) return element line {$line}
+      $file-logs := for $line in tr:get-job-messages($run, $converter) return element line {$line}
   return 
     if (xs:boolean($authed/@allowed))
     then element log-messages {$file-logs}
@@ -212,9 +178,10 @@ function api:get-converter-run-file-results($converter-id as xs:string, $runid a
   let $headers as map(xs:string, xs:string*):= request:header-map(),
       $authed as element(auth):= api:auth($headers),
       $username := $authed/username,
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
       $run as element(run) := tr:get-run($runid),
       $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
-      $files := tr:get-result-files($run)
+      $files := tr:get-result-files($run, $converter)
   return 
     if (xs:boolean($authed/@allowed))
     then element result-files {$files}
@@ -258,6 +225,205 @@ function api:get-converter-runs-download($converter-id as xs:string, $runid as x
   return 
     if ($filename = map:keys($result-files))
     then file:read-binary($filepath)
+    else element error {'File not found!'}
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker")
+  %output:method("xml")
+function api:get-worker($lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)* := tr:get-worker()
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element workers {$worker}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter")
+  %output:method("xml")
+function api:get-converters($lang as xs:string, $worker-id as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converters as element(converter)* := tr:get-worker-converter($worker)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element converters {$converters}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}")
+  %output:method("xml")
+function api:get-converter($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $right := $worker-id || '-' || $converter-id || ':convert',
+      
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+      
+      $allowed as xs:boolean := api:can-do($right, $username) and xs:boolean($authed/@allowed)
+  return 
+    if ($allowed)
+    then $converter
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:POST
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}")
+  %rest:form-param('file', '{$file}')
+  %output:method("xml")
+function api:convert($worker-id as xs:string, $file as map(xs:string, xs:base64Binary), $converter-id as xs:string, $lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+      
+      $text-params := map:remove(request:parameter-map(),('file','file')),
+      
+      $right := $worker-id || '-' || $converter-id || ':convert',
+      $is-allowed := (api:can-do($right, $username) and xs:boolean($authed/@allowed)),
+      $run as (element(error)|element(run)) :=
+        if ($is-allowed)
+        then tr:start-run($file, $text-params, $converter, $username, $worker)
+        else element error {i18n:val('not-allowed-message',$lang)}
+  return $run
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs")
+  %output:method("xml")
+function api:get-converter-runs($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+      $runs as element(runs) := tr:get-runs($converter, $username)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then $runs
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}")
+  %output:method("xml")
+function api:get-converter-run($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+      $run as element(run)? := tr:get-run($runid, $converter, $worker),
+      $result-files as element(file)* := tr:get-result-files($run, $converter, $worker),
+      $job-messages := tr:get-job-messages($run, $converter, $worker)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then $run update {insert node $result-files into ., insert node element call-result {$job-messages} into .}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/logs")
+  %output:method("xml")
+function api:get-converter-run-file-logs($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker, $converter-id),
+      $run as element(run)? := tr:get-run($runid),
+      $file-logs := tr:get-file-logs($run, $converter, $worker)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element file-log {$file-logs}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/job-messages")
+  %output:method("xml")
+function api:get-converter-run-job-messages($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker, $converter-id),
+      $run as element(run) := tr:get-run($runid, $converter, $worker),
+      $file-logs := tr:get-job-messages($run,$converter)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element log-messages {$file-logs}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/files")
+  %output:method("xml")
+function api:get-converter-run-file-results($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($converter-id),
+      $run as element(run) := tr:get-run($runid, $converter, $worker),
+      $files := tr:get-result-files($run,$converter)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element result-files {$files}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/cancel")
+  %output:method("xml")
+function api:get-converter-stop-run($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($converter-id),
+      $run as element(run)? := tr:get-run($runid, $converter),
+      $stop := tr:stop-run($run, $username, $converter, $worker)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element result{$stop}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}/download/{$filename}")
+function api:get-converter-runs-download($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string, $filename as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($converter-id),
+      $run as element(run)? := tr:get-run($runid, $converter),
+      $data as xs:base64Binary? := tr:get-file($run, $filename, $converter, $worker)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then $data
     else element error {'File not found!'}
 };
 

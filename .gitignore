@@ -4,4 +4,5 @@ src/transpectui/converter.xml
 src/transpectui/config.xml
 src/transpectui/users.xml
 src/static/WEB-INF
+docker/docker-compose.yml
 .env

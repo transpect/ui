@@ -57,7 +57,7 @@ declare function worker:get-job-messages($worker as element(worker), $converter 
 
 declare function worker:get-result-files($worker as element(worker), $converter as element(converter), $run as element(run)) as element(file)* {
   let $files := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'files'),'/'))[2]//file
-  return $files
+  return $files/file
 };
 
 declare function worker:get-file($worker as element(worker), $converter as element(converter), $run as element(run), $filename as xs:string) as xs:base64Binary {
@@ -101,7 +101,7 @@ declare function worker:get-by-id($worker-id as xs:string?) as element(worker)? 
  :)
 declare %private function worker:request($url, $header := (), $body as item()* := (), $method as xs:string := 'get', $override-media-type as xs:string? := ()) {
   let $result := 
-        http:send-request( 
+        http:send-request(
           element http:request {
             attribute method {$method},
             (attribute override-media-type {$override-media-type})[$override-media-type],

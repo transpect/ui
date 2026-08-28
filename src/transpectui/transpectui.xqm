@@ -254,14 +254,17 @@ declare
 function ui:get-worker-converter-runs($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
   let $url := '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs',
       $right := tr:endpoint-right($url),
-      $check := ui:check($right,$lang,$url),
-      $worker as element(worker)? := tr:get-worker($worker-id),
-      $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
-      $username := ui:access-session('username'),
-      $title := i18n:val('conversions',$lang),
-      $return-url := '/worker/' || $worker-id || '/converter/' || $converter-id,
-      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'right':$right, 'username': $username}
-  return ui:build-runs-page($converter, $context)
+      $check := ui:check($right,$lang,$url)
+  return (
+    $check,
+    let $worker as element(worker)? := tr:get-worker($worker-id),
+        $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+        $username := ui:access-session('username'),
+        $title := i18n:val('conversions',$lang),
+        $return-url := '/worker/' || $worker-id || '/converter/' || $converter-id,
+        $context := map {'title': $title, 'lang': $lang, 'url':$url, 'right':$right, 'username': $username}
+    return ui:build-runs-page($converter, $context)
+  )   
 };
 
 declare
@@ -482,7 +485,7 @@ function ui:login-frontend($lang as xs:string, $return-url as xs:string?, $messa
         element div {
           attribute class {'well'},
           element form {
-            attribute action {'do-login'},
+            attribute action {'do-login?url=' || $return-url},
             attribute method {'POST'},
             
             hf:parameter-to-html(<input type="text" name-de="Username" name-en="Username" p-name="username" required=""/>,$lang),
@@ -655,7 +658,7 @@ function ui:user($lang, $username-to-update, $return-url){
               for $name in sessions:names($id)
               return
                 element div {
-                  element span {$name || ':' || sessions:get($id, $name)}
+                  element span {$name || ': ' || sessions:get($id, $name)}
                 },
               ui:create-anchor($context, 'Session löschen','/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url])
               }
@@ -727,7 +730,7 @@ function ui:user($lang, $username-to-update, $return-url){
             }
           }
         }
-      },
+      }(:,
       element div {
         attribute class {'well'},
         element details {
@@ -747,7 +750,7 @@ function ui:user($lang, $username-to-update, $return-url){
               else
                 element span {attribute class {'d-block stacked'}, $k}
         }
-      }
+      }:)
     ),())
   )
 };
@@ -1287,22 +1290,6 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
     },
     element div {
       attribute class {'d-flex start'},
-      let $bc := ($context?url => tokenize('/'))[normalize-space(.)]
-      return if ((count($bc) gt 1) and ($context?url ne '/login'))
-      then (
-        element div {
-          attribute class {'breadcrumbs'},
-          let $parts := $context?url => tokenize('/')
-          return 
-            for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
-            let $href := string-join($parts[position() le $i + 1],'/'),
-                $allowed := ui:can-do($context?username, $href),
-                $log := hf:log($context?username || '| ' || $href)
-            return element span {ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)}
-        },
-        element span { '|'}
-        )
-      else (),
       element div {
         attribute class {'nav'},
         element span {'Navigation: '},
@@ -1314,12 +1301,26 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
         then (
           element span {', '},
           element span {ui:create-anchor($context, i18n:val('back',$context?lang), '/' || $context?lang || $context?return-url,(),true())})
-        
-      }
+      }[exists($context?username)],
+      let $bc := ($context?url => tokenize('/'))[normalize-space(.)]
+      return if ((count($bc) gt 1) and ($context?url ne '/login'))
+      then (
+        element span { '|'},
+        element div {
+          attribute class {'breadcrumbs'},
+          let $parts := ($context?url => tokenize('/'))[position() ne last()]
+          return 
+            for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
+            let $href := string-join($parts[position() le $i + 1],'/'),
+                $allowed := ui:can-do($context?username, $href),
+                $log := hf:log($context?username || '| ' || $href)
+            return element span {ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)}
+        }
+        )
+      else ()
     }
   }
 }; 
-
 
 declare function ui:can-do($username,$url) {
   let $can := tr:can-do($username,tr:endpoint-right($url), tr:endpoint-owner($url)),
