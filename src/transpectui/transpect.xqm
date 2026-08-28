@@ -115,7 +115,7 @@ declare function tr:get-run($runid as xs:string, $converter as element(converter
 declare function tr:start-run($file as map(xs:string, xs:base64Binary), $text-params as map(*)?, $converter as element(converter)?, $username as xs:string, $worker as element(worker)? := ()) {
   if (exists($worker))
   then
-    worker:convert($worker, $converter, $file, $text-params, $username)
+    worker:convert($worker, $converter/xs:string(@id), $file, $text-params, $username)
   else
     make:start-target-run('conversion', $converter, $text-params, $file, $username) 
 };
