@@ -21,8 +21,8 @@ declare function ui:check($right as xs:string?, $lang as xs:string, $return-url 
 declare function ui:check-only($right as xs:string?, $owner as xs:string? := ()){
   let $username := ui:access-session('username'),
       $token := ui:access-session('token'),
-      $is-allowed := tr:check($username, $token, $right) or ($owner eq $username),
-      $log := hf:log('r: ' || $right || ' u: ' || ui:access-session('username') || ' o: ' || $owner || ' a: ' || $is-allowed,'CHECK')
+      $is-allowed := tr:check($username, $token, $right) or ($owner eq $username)(:,
+      $log := hf:log('r: ' || $right || ' u: ' || ui:access-session('username') || ' o: ' || $owner || ' a: ' || $is-allowed,'CHECK'):)
   return $is-allowed
 };
 
@@ -65,10 +65,12 @@ function ui:default($lang) {
             let $cs as element(converter)* := tr:get-worker-converter($w)
             return
               (
-                element h3 {xs:string($w/@name)},
+                element h3 {
+                  attribute class {'ml-10'},
+                  xs:string($w/@name)},
                 for $c in $cs
-                let $allowed := ui:can-do($username,$url || '/worker/' || $c/@worker || '/converter/' || $c/@id)
-                return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,(),$allowed)
+                let $allowed := ui:can-do($username,'/worker/' || $c/@worker || '/converter/' || $c/@id)
+                return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,'ml-20',$allowed)
               )
           }[count($workers) gt 0 ]),
         $description := 
@@ -119,6 +121,68 @@ function ui:converter-list($lang as xs:string){
     )
 };
 
+declare
+  %rest:GET
+  %rest:path("/{$lang}/admin")
+  %output:method("html")
+  %output:html-version('5')
+function ui:admin($lang as xs:string){
+  let $right := 'admin:admin',
+      $title := 'Admin View',
+      $url := '/admin',
+      $username := ui:access-session('username'),
+      $header := request:header-map(),
+      $memory as element(mem) := tr:system-memory(),
+      $cpu as element(cpu) := tr:system-cpu(),
+      $mem-bar-values := (
+        map {'name': 'Inactive', 'value':xs:integer($memory/entry[@key eq 'Inactive']/@value), 'background-color':'lightblue'},
+        map {'name': 'Active', 'value':xs:integer($memory/entry[@key eq 'Active']/@value), 'background-color':'lightblue'},
+        map {'name': 'Free', 'value':xs:integer($memory/entry[@key eq 'MemFree']/@value), 'background-color':'beige'}
+      ),
+      $cpu-bar-values := (
+        map {'name': 'Used', 'value':(100 - xs:decimal($cpu/cpuall/entry[@key eq '%idle']/@value)), 'background-color':'lightblue'},
+        map {'name': 'Idle', 'value':xs:decimal($cpu/cpuall/entry[@key eq '%idle']/@value), 'background-color':'beige'}
+      ),
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
+  return (
+    ui:check($right, $lang, $url),
+    ui:page($context,
+    (element div {
+      attribute class {'well'},
+      ui:stacked-bars($mem-bar-values, true()),
+      element details {
+        element summary {'Memory Details'},
+        for $entry in $memory/entry
+        let $value := if (matches(xs:string($entry/@value),'^\d+$')) then prof:human(xs:integer($entry/@value) * 1024) else xs:string($entry/@value)
+        return 
+          element div {
+            attribute class {'d-flex start gap'},
+            element div {xs:string($entry/@key)},
+            element div {$value}
+          }
+        }
+      },
+    element div {
+      attribute class {'well'},
+      ui:stacked-bars($cpu-bar-values, false()),
+      element details {
+        element summary {'CPU Details'},
+        for $k in $cpu/*
+        return 
+          element div {
+            attribute class {'d-flex start gap'},
+            element div {
+              attribute style {'min-width:50px;'}, 
+              name($k)},
+            ui:stacked-bars(
+              for $entry in $k/entry[@key ne 'CPU'] return map {'name': $entry/@key, 'value':xs:decimal($entry/@value), 'background-color':'white', 'color':'white'},
+              false(),'small', false())
+          }
+        }
+      }
+    )))
+};
+
 (: WORKER :)
 
 declare
@@ -143,7 +207,10 @@ function ui:worker-list($lang as xs:string){
               attribute class {'well'},
               element h3 {i18n:val('workers',$lang)},
               for $worker in $workers
-              let $status as xs:string? := tr:get-worker-status($worker),
+              let $status := tr:get-worker-status($worker),
+                  $status-text as xs:string := xs:string($status/@status),
+                  $worker-cpu := $status/cpu,
+                  $worker-memory := $status/memory,
                   $url := '/worker/' || $worker/@id,
                   $allowed := ui:can-do($username, $url)
               return
@@ -690,7 +757,8 @@ function ui:user($lang, $username-to-update, $return-url){
                 element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
               ),
             element span {' - ' || $name},
-            element span {attribute class {'date'}, ' (rights: ' || string-join(for $right in $role/right return ($right/@name,$right/@matches),', ') || ')'}
+            element span {attribute class {'date'}, ' (rights: ' || string-join(for $right in $role/right return ($right/@name,$right/@matches),', ') || ')'},
+            if ($name eq 'admin') then ui:create-anchor($context, 'Admin View', '/' || $lang || '/admin', ('ml-10'), ui:can-do($context?username, '/' || $lang || '/admin')) else ()
           }
       },
       element div {
@@ -1482,4 +1550,27 @@ declare function ui:list-to-xml($current, $subs, $urls){
         }
     else for $c in $children
       return ui:list-to-xml($c,$subs,$urls)
+};
+
+declare function ui:stacked-bars($vals as map(*)*, $mem as xs:boolean, $class as xs:string? := (), $show-values as xs:boolean? := true()) {
+  element div {
+    attribute class {'bar-diagram d-flex start ' || $class},
+    let $all as xs:integer := sum($vals ! .?value),
+        $length as xs:decimal := max(($vals ! .?value))
+    return (
+      for $v in $vals
+      let $name :=  $v?name,
+          $value := $v?value,
+          $display :=
+            if ($value)
+            then (if ($mem) then prof:human($value * 1024) else prof:human(xs:integer(round($value))) || '%') ||' (' || $name || ')'
+            else 'EMPTY'
+      return
+        element div {
+          attribute class {'bar-content'},
+          attribute style {'width:' || xs:string(($value div $length) * 100) || '%;' || (for $c in map:keys($v)[not(. = ('name','value'))] return $c || ': ' || $v?$c ||';')},
+          attribute title {$display},
+          $display[$show-values]
+        })
+  }
 };

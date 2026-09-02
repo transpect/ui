@@ -578,7 +578,11 @@ declare %private function api:converter($username as xs:string, $lang as xs:stri
 };
 
 declare %private function api:status() {
-  element status {'running'}
+  element status {
+    attribute status {'running'},
+    tr:system-cpu(),
+    tr:system-memory()
+  }
 };
 
 declare %private function api:auth($headers as map(xs:string, xs:string*)?, $allowed-override as xs:boolean? := false()) as element(auth) {

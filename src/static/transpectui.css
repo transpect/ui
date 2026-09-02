@@ -233,6 +233,13 @@ div.content-log {
   }
 }
 
+.ml-10 {
+  margin-left:10px;
+}
+.ml-20 {
+  margin-left:20px;
+}
+
 .filename a {
   text-decoration:none;
 }
@@ -285,4 +292,23 @@ div.content-log {
 }
 .nav {
   margin: 0 20px 20px;
+}
+.bar-diagram {
+  width:100%;
+}
+.bar-content {
+  height : 30px;
+  border: 1px grey solid;
+  white-space: nowrap;
+  padding-left:5px;
+  padding-right:5px;
+  box-sizing:border-box;
+  &:first-child {
+    border-top-left-radius:5px;  
+    border-bottom-left-radius:5px;  
+  }
+  &:last-child {
+    border-top-right-radius:5px;  
+    border-bottom-right-radius:5px;  
+  }
 }

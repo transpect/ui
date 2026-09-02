@@ -6,6 +6,7 @@ import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
 
 declare variable $tr:rights-map :=
   map {
+    '^(/[^/]+)?/admin':'admin:admin',
     '^(/[^/]+)?/worker$':'worker:list',
     '^(/[^/]+)?/worker/([^/]+)$':'$2:list',
     '^(/[^/]+)?/worker/([^/]+)/converter$':'$2:list',
@@ -234,3 +235,38 @@ declare function tr:get-local-converter($converter-id as xs:string? := ()) as el
   else conv:get-all()
 };
 
+declare function tr:system-memory() as element(mem){
+  let $lines := proc:execute("cat",'/proc/meminfo') ! tokenize(.,'\n')
+  return 
+    element mem {
+      for $l in $lines
+      let $tokens := tokenize($l,':'),
+          $key := normalize-space($tokens[1]),
+          $value := normalize-space($tokens[2] => replace('kB',''))
+      return element entry {
+        attribute key {$key},
+        attribute value {if (matches($value,'^\d+$')) then xs:integer($value) else $value}
+        
+      } 
+    }
+};
+
+declare function tr:system-cpu() as element(cpu){
+  let $info := tokenize(proc:execute('mpstat',('-P', 'ALL'))/output,'\n')[matches(.,'^\d')],
+	$names := tokenize($info[1],' ')
+return 
+  element cpu {
+    for $line in $info[position() ne 1]
+      let $token := tokenize($line,' ')
+      return 
+      	element {'cpu' || $token[3]} {
+       	 for $name at $index in $names
+       	 where $index = (3 to 13)
+          return
+            element entry {
+              attribute key {$name},
+              attribute value {$token[$index]}
+            }
+        }
+  }
+};
