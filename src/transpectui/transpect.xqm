@@ -147,7 +147,13 @@ declare function tr:get-file($run as element(run), $filename as xs:string,  $con
 declare function tr:get-job-messages($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) as element(line)* {
   if (exists($worker))
   then worker:get-job-messages($worker, $converter, $run)
-  else make:store-job-messages($run)
+  else for $l in make:store-job-messages($run) return element line {$l}
+};
+
+declare function tr:get-job-errors($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) as element(line)* {
+  if (exists($worker))
+  then worker:get-job-errors($worker, $converter, $run)
+  else for $l in make:store-job-errors($run) return element line {$l}
 };
 
 declare function tr:allowed($converter as element(converter), $caller as xs:string?, $run as element(run)){
@@ -218,8 +224,8 @@ declare function tr:get-worker-status($worker as element(worker)) as xs:string? 
   worker:get-status($worker)
 };
 
-declare function tr:get-worker-converter($worker-id as xs:string? := (), $converter-id as xs:string? := ()) as element(converter)* {
-  worker:converter(worker:get-by-id($worker-id),$converter-id)
+declare function tr:get-worker-converter($worker as element(worker)? := (), $converter-id as xs:string? := ()) as element(converter)* {
+  worker:converter($worker,$converter-id)
 };
 
 declare function tr:get-local-converter($converter-id as xs:string? := ()) as element(converter)* {

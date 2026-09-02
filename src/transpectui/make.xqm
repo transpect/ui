@@ -56,7 +56,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       
       $store := st:set('params', $runid, $parameters),
       $start-callback := $ns:store || " declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')",
-      $end-callback := $ns:make || " declare variable $job-id external; make:store-job-messages('" || $runid || "')",
+      $end-callback := $ns:make || " declare variable $job-id external; make:store-job-messages('" || $runid || "'), make:store-job-errors('" || $runid || "')",
       $queue-job :=
         queue:register(
           $ns:store || " declare variable $parameters external;
@@ -79,7 +79,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
          }
 };
 
-declare function make:store-job-messages($run as element(run)){
+declare function make:store-job-messages($run as element(run)) as xs:string*{
   let $runid := $run/runid/text(),
       $job-id := st:get('job-id',$runid),
       $state := if ($job-id) then job:list-details($job-id)/xs:string(@state) else 'not-found',
@@ -91,6 +91,20 @@ declare function make:store-job-messages($run as element(run)){
         then st:set('job-results',$runid, $messages)
         else ()
   return $messages
+};
+
+declare function make:store-job-errors($run as element(run)) as xs:string*{
+  let $runid := $run/runid/text(),
+      $job-id := st:get('job-id',$runid),
+      $state := if ($job-id) then job:list-details($job-id)/xs:string(@state) else 'not-found',
+      $errors := 
+        if ($state eq 'cached')
+        then job:result($job-id,map {'keep':true()})[1]/error/text() ! tokenize(.,'\n')
+        else st:get('job-errors',$runid),
+      $store := if ($state eq 'cached')
+        then st:set('job-errors',$runid, $errors)
+        else ()
+  return $errors
 };
 
 declare function make:start-target($target-name as xs:string, $converter as element(converter), $filepath as xs:string, $runid as xs:string, $parameters as xs:string*) as xs:string {

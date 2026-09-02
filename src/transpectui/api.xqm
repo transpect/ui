@@ -172,6 +172,24 @@ function api:get-converter-run-job-messages($converter-id as xs:string, $runid a
 
 declare
   %rest:GET
+  %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/job-errors")
+  %output:method("xml")
+function api:get-converter-run-job-errors($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
+      $run as element(run) := tr:get-run($runid),
+      $out-path := $run/params/line[matches(.,'OUT_DIR')] ! tokenize(.,'=')[2],
+      $file-logs := for $line in tr:get-job-errors($run, $converter) return element line {$line}
+  return 
+    if (xs:boolean($authed/@allowed))
+    then element log-errors {$file-logs}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:GET
   %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/files")
   %output:method("xml")
 function api:get-converter-run-file-results($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){

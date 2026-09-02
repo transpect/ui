@@ -55,6 +55,10 @@ declare function worker:get-job-messages($worker as element(worker), $converter 
   worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'job-messages'),'/'))[2]//line
 };
 
+declare function worker:get-job-errors($worker as element(worker), $converter as element(converter), $run as element(run)) as element(line)* {
+  worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid,'job-errors'),'/'))[2]//line
+};
+
 declare function worker:get-result-files($worker as element(worker), $converter as element(converter), $run as element(run)) as element(file)* {
   let $files := worker:get($worker, string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid, 'files'),'/'))[2]//file
   return $files
@@ -75,10 +79,10 @@ declare function worker:get($worker as element(worker), $url as xs:string, $head
 };
 
 declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $text-params, $username as xs:string? := 'transpectui') as element(run)?{
-  worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username)[2]/run
+  worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username, $text-params)[2]/run
 };
 
-declare function worker:post($worker as element(worker), $url as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string) {
+declare function worker:post($worker as element(worker), $url as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string, $text-params) {
   let $header :=( 
         <http:header name='username' value='{$username}'/>,
         <http:multipart media-type='multipart/form-data'>
@@ -86,13 +90,13 @@ declare function worker:post($worker as element(worker), $url as xs:string, $fil
             value='form-data; name="file"; filename="{ map:keys($file)[1] }"'/>
           <http:body media-type='application/octet-stream'/>
         </http:multipart>),
-      $result := worker:request($worker/base-url || $url, $header, map:items($file)[1], 'POST'),
+      $url-with-params := $url || '?' || string-join(for $k in map:keys($text-params) return $k || '=' || fn:encode-for-uri(normalize-space($text-params?$k)),'&amp;'),  
+      $result := worker:request($worker/base-url || $url-with-params, $header, map:items($file)[1], 'POST'),
       $store := store:put('post',$result)
 return $result
 };
 
 declare function worker:get-by-id($worker-id as xs:string?) as element(worker)? {
-  hf:log($worker-id,'W-ID'),
   $worker:worker[@id eq $worker-id]
 };
 

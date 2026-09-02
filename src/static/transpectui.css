@@ -221,6 +221,17 @@ div.content-log {
     border-bottom: none;
   }
 }
+.log-error {
+  margin:5px;
+  display:flex;
+  color:red;
+  
+  border-bottom: 1px grey solid;
+  padding: 5px;
+  &:last-child {
+    border-bottom: none;
+  }
+}
 
 .filename a {
   text-decoration:none;

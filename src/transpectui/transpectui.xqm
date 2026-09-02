@@ -62,7 +62,7 @@ function ui:default($lang) {
             attribute class {'well'},
             element h2 {i18n:val('workers',$lang)},
             for $w in $workers
-            let $cs as element(converter)? := tr:get-worker-converter($w)
+            let $cs as element(converter)* := tr:get-worker-converter($w)
             return
               (
                 element h3 {xs:string($w/@name)},
@@ -1060,8 +1060,9 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
         $context := map:merge(($context, map {'status': $short-status || ' ', 'refresh': $refresh, 'subtitle':$subtitle})),
         $log-dir := (($run/file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
         $logs as element(line)* := tr:get-file-logs($run, $converter, $worker),
-        $job-results := tr:get-file-logs($run, $converter, $worker),
-        $post-conv-actions := conv:get-post-conv-actions($converter),
+        $job-results := tr:get-job-messages($run, $converter, $worker),
+        $job-errors := tr:get-job-errors($run, $converter, $worker),
+        (:$post-conv-actions := conv:get-post-conv-actions($converter),:)
         $result-files as element(file)*:= tr:get-result-files($run, $converter, $worker)
     return 
       ui:page(
@@ -1114,7 +1115,7 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
                   attribute target {'_blank'},
                   attribute download {$file/@name},
                   xs:string($file/@name)
-                }},
+                }}(:,
               element div {
                 attribute class {'actions'},
                 for $action in $post-conv-actions
@@ -1125,7 +1126,7 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
                     attribute value {$action/xs:string(@message)},
                     attribute data-href {config:url(string-join(('/run',$runid, $file/@name, 'action', $action/xs:string(@target)),'/'))}
                   }
-              }
+              }:)
             }
           },
           element details {
@@ -1133,6 +1134,12 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
             element summary {i18n:val('run',$context?lang)},
             element div {
               attribute class {'overflow'},
+              for $m  at $index in $job-errors
+              return element div {
+                attribute class {'log-error'},
+                element span {attribute class {'index'}, $index},
+                element span {$m}
+              },
               for $m  at $index in $job-results
               return element div {
                 attribute class {'log-entry'},
