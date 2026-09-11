@@ -312,3 +312,17 @@ div.content-log {
     border-bottom-right-radius:5px;  
   }
 }
+.blurred {
+  backdrop-filter: blur(10px) brightness(25%);
+  color:white;
+}
+.fullscreen {
+  position: fixed;
+  text-align:center;
+  padding:200px;
+  top:0px;
+  width:100vw;
+  height:100vh;
+  z-index:100;
+  font-family: var(--bs-body-font-family);
+}

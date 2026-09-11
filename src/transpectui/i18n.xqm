@@ -143,6 +143,10 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Aufruf</replacement>
       <replacement lang="en">Run</replacement>
     </static-replacement>
+    <static-replacement tag="last-online">
+      <replacement lang="de">zuletzt online</replacement>
+      <replacement lang="en">last online</replacement>
+    </static-replacement>
     <static-replacement tag="finished-conversions">
       <replacement lang="de">Beendete Konvertierungen</replacement>
       <replacement lang="en">Finished Conversions</replacement>

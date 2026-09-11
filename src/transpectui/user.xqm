@@ -45,6 +45,7 @@ declare %private function u:merge($users-default as element(users)*,$users-file 
         then element error { attribute code {'400'}, 'Usernames are not equal'}
         else 
           element user {
+            $user-top/@last-online,
             attribute source {
               if (exists($user-base) and exists($user-top))
               then 'merged'
@@ -174,7 +175,7 @@ declare function u:validate-password($username as xs:string, $password as xs:str
   let $user := u:users-int($username),
       $salt := $user/salt/text(),
       $hash := xs:string(hash(concat($salt,$password),map:entry('algorithm','SHA-256')))
-  return xs:boolean($hash eq $user/password/text())
+  return xs:boolean(true() and $hash eq $user/password/text())
 };
 
 declare function u:validate-token($username as xs:string?, $token as xs:string?) as xs:boolean {
@@ -269,7 +270,7 @@ declare function u:set-password($username, $password) {
         then $users update {
           replace node users/user[username eq $username]/password with $updated-user/password,
           replace node users/user[username eq $username]/salt with $updated-user/salt}
-        else $users update {insert node $updated-user into .},
+        else $users update {insert node $updated-user into users},
       $write := u:write-users-file($add-user)
   return $add-user/users/user[username eq $username]
 };
@@ -313,4 +314,11 @@ let $user-roles := $user/roles
          or (if (exists($user-role/@matches)) then matches($right, $user-role/@matches) else false())
       return $user-role
     return $matching-roles
+};
+
+declare function u:update-timestamp($username as xs:string){
+  let $user := u:users-int($username),
+      $updated := $user update {delete node @last-online, insert node attribute last-online {xs:string(current-dateTime())} into .},
+      $updated-users := u:write-users-file(doc($u:users-file) update {delete node users/user[username eq $username], insert node $updated into users})
+  return ()
 };

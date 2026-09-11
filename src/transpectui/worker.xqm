@@ -19,7 +19,7 @@ declare function worker:converter($worker as element(worker)? := (), $converter-
 };
 
 declare function worker:get-status($worker as element(worker)) {
-  let $status := worker:get($worker, string-join(('','api','en','status'),'/'))
+  let $status := worker:get($worker, string-join(('','api','en','status'),'/'))[2]/*
   return $status
 };
 

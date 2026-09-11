@@ -13,8 +13,8 @@ declare function hf:eval($namespaces as xs:string*, $query as xs:string, $variab
         for $k in $variables ! map:keys(.)
         where not(contains($query,'declare variable $' || $k ||' external;'))
         return 'declare variable $' || $k ||' external;',
-      $log := if ($hf:log-eval) then admin:write-log($query,'EVAL') else (),
       $call := string-join(($namespaces, $declaration, $query),'&#13;'),
+      $log := if ($hf:log-eval) then admin:write-log($call,'EVAL') else (),
       $job-id := job:eval($call, $variables, $options),
       $start-emit := hf:emit-updates($job-id, $emit-options)
   return $job-id
@@ -174,7 +174,7 @@ declare function hf:create-anchor($href,$text as xs:string? := (), $classes as x
 };
 
 declare function hf:format-dateTime($dateTime as xs:dateTime) as xs:string {
-  format-dateTime($dateTime,'[D,2].[M,2].[Y,4] [H,2]:[m,2]:[s,2]')
+  format-dateTime($dateTime,'[D,2].[M,2].[Y,4] [H,2]:[m,2]:[s,2]') || ' UTC'
 };
 
 declare function hf:static-replace-variables($text,$bindings as map(*)? := map {},$quotes as xs:string? := "'",$no-quotes as xs:boolean := false()) as xs:string {

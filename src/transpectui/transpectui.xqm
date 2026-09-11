@@ -175,7 +175,11 @@ function ui:admin($lang as xs:string){
               attribute style {'min-width:50px;'}, 
               name($k)},
             ui:stacked-bars(
-              for $entry in $k/entry[@key ne 'CPU'] return map {'name': $entry/@key, 'value':xs:decimal($entry/@value), 'background-color':'white', 'color':'white'},
+            (
+              for $entry in $k/entry[@key ne 'CPU'] where $entry/@key ne '%idle' return map {'name': $entry/@key, 'value':xs:decimal($entry/@value), 'background-color':'lightblue', 'color':'white'},
+              for $entry in $k/entry[@key ne 'CPU'] where $entry/@key eq '%idle' return map {'name': $entry/@key, 'value':xs:decimal($entry/@value), 'background-color':'beige', 'color':'white'}
+              
+              ),
               false(),'small', false())
           }
         }
@@ -207,7 +211,7 @@ function ui:worker-list($lang as xs:string){
               attribute class {'well'},
               element h3 {i18n:val('workers',$lang)},
               for $worker in $workers
-              let $status := tr:get-worker-status($worker),
+              let $status as element(*) := tr:get-worker-status($worker),
                   $status-text as xs:string := xs:string($status/@status),
                   $worker-cpu := $status/cpu,
                   $worker-memory := $status/memory,
@@ -218,7 +222,7 @@ function ui:worker-list($lang as xs:string){
                 attribute class {''},
                 ui:create-anchor($context, xs:string($worker/@name),'/' || $lang || $url, (),$allowed),
                 element span {
-                  attribute class {if ($status eq 'running') then 'green' else 'red'},
+                  attribute class {if ($status-text eq 'running') then 'green' else 'red'},
                   attribute title {i18n:val($status,$lang)},
                   ' ⬤'}
               }
@@ -715,6 +719,7 @@ function ui:user($lang, $username-to-update, $return-url){
       $right := tr:endpoint-right($url),
       $owner := tr:endpoint-owner($url),
       $user-roles := u:roles-for-username($username-to-update),
+      $user := u:users($username-to-update),
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'username': $username, 'return-url':$return-url}
   return (
     ui:check($right, $lang, $url, $username-to-update),
@@ -722,6 +727,7 @@ function ui:user($lang, $username-to-update, $return-url){
       element div {
         attribute class {'well'},
         element h3 {i18n:val('sessions',$lang)},
+        (element span {attribute class {'date spacious'},i18n:val('last-online',$lang) || ': ' || hf:format-dateTime(xs:dateTime($user/xs:string(@last-online)))})[$user/@last-online],
         for $id in $session-ids
         return
           element div {
@@ -868,7 +874,8 @@ function ui:user-management($lang){
       $url := '/users',
       $right := tr:endpoint-right($url),
       $username := ui:access-session('username'),
-      $context := map {'title': $title, 'lang': $lang, 'url':$url,'username':$username}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url,'username':$username},
+      $online-users as xs:string* := (job:execute($ns:data || 'data:get-online-users()'),$username)
   return (
     ui:check($right, $lang, $url),
     ui:page(
@@ -882,7 +889,10 @@ function ui:user-management($lang){
             return 
               element div {
                 attribute class {'d-flex'},
-                ui:create-anchor($context, $user/username,'/' || $lang || '/users/' || $user/username),
+                element div {ui:create-anchor($context, $user/username,'/' || $lang || '/users/' || $user/username),
+                if ($online-users = $user/username)
+                then element span {attribute class {'green'},' ⬤'}
+                else element span {attribute class {'red'},' ⬤'}},
                 ui:create-anchor($context, i18n:val('delete',$lang),'/' || $lang || '/users/' || $user/username || '/delete?url=' || $url) 
               }
           }
@@ -990,6 +1000,32 @@ declare function ui:empty-run-info($tag, $lang) {
   }
 };
 
+(:declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
+  ui:check($context?right, $context?lang, $context?return-url),
+  let $call := string-join((xs:string($converter/@worker),xs:string($converter/@id),$context?username),'|')
+  return
+    ui:page(
+      $context,
+      element div {
+          attribute class {'well'},
+          element div {
+            attribute class {'date spacious'},
+            i18n:val('called',$context?lang) || ': ' || hf:format-dateTime(current-dateTime())
+          },
+          element div {
+            attribute class {'well'},
+            <div class="run-info line template" data-template-call="{$call}">
+              <div class="run-info running" data-content-path="/@status">Laden...<a data-href-path="/@path" title="Ergebnisse">Ergebnisse</a></div>
+              <div class="run-info runid" data-content-path="/runid/text()">Laden...</div>
+              <div class="run-info starttime" data-content-path="/@started">Laden...</div>
+              <div class="run-info file" data-content-path="/filename">Laden...</div>
+              <div class="run-info username" data-content-path="/username">Laden...</div>
+              <div class="run-info username" data-content-path="/worker">Laden...</div>
+            </div>
+          }
+        }
+    )
+};:)
 
 declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
   ui:check($context?right, $context?lang, $context?return-url),
@@ -1009,11 +1045,11 @@ declare function ui:build-runs-page($converter as element(converter), $context a
       $pending-runs :=
         for $run in $allowed-runs
         where xs:boolean($run/status/text() eq 'pending')
-        return $run,
-      $context := map:merge(($context, map {'refresh': 5}))
+        return $run(:,
+      $context := map:merge(($context, map {'refresh': 5})):)
   return
     ui:page(
-      $context,
+      $context, 
       element div {
           attribute class {'well'},
           element div {
@@ -1363,7 +1399,7 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
             element div {
               attribute class {'d-flex column'},
               attribute style {'margin-top: -5px;'},
-              hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?return-url=' || config:url($context?url)),session:get('username'),'lang-img right'),
+              hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?return-url=' || config:url($context?url)),session:get('username'),'lang-img right username'),
               hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
             }
           else if (not($context?hide-login)) then hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
@@ -1403,7 +1439,7 @@ declare %private function ui:get-html-header($context as map(xs:string, item()?)
   }
 }; 
 
-declare function ui:can-do($username,$url) {
+declare function ui:can-do($username,$url as xs:string) {
   let $can := tr:can-do($username,tr:endpoint-right($url), tr:endpoint-owner($url)),
       $log := hf:log('u: ' || $url || ' u: ' || $username || ' c: ' || xs:string($can),'CAN')
   return $can
@@ -1562,8 +1598,8 @@ declare function ui:stacked-bars($vals as map(*)*, $mem as xs:boolean, $class as
       let $name :=  $v?name,
           $value := $v?value,
           $display :=
-            if ($value)
-            then (if ($mem) then prof:human($value * 1024) else prof:human(xs:integer(round($value))) || '%') ||' (' || $name || ')'
+            if (exists($value))
+            then (if ($mem) then prof:human($value * 1024) else xs:integer(round($value)) || '%') ||' (' || $name || ')'
             else 'EMPTY'
       return
         element div {

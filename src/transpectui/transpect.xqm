@@ -3,6 +3,8 @@ import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
 import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
+import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
 
 declare variable $tr:rights-map :=
   map {
@@ -184,8 +186,30 @@ declare function tr:get-runs($converter as element(converter)) as element(run)* 
     else make:get-local-runs($converter)
 };
 
-declare function tr:get-runs($converter as element(converter), $username as xs:string) as element(runs) {
-admin:write-log('select runs for ' || $converter/@id || ', ' || $username ,'RUNS'),
+declare function tr:search($filter as element(filter)){
+  let $object-type as xs:string:= $filter/@object-type,
+      $context := map:merge(
+        for $att in $filter/@* except $filter/@object-type
+        return map:entry(name($att),xs:string($att))
+      ),
+      $result :=
+        switch($object-type)
+        case 'run' return tr:search-run($context) 
+        default return ()
+  return $result
+};
+
+declare function tr:search-run($context as map(*)) {
+  let $worker := if ($context?worker-id) then tr:get-worker($context?worker-id) else (),
+      $converter := if ($worker) then tr:get-worker-converter($worker,$context?coverter-id) else tr:get-local-converter($context?coverter-id),
+      $username := $context?username
+  return tr:get-runs($converter, $username, false())      
+};
+
+declare function tr:get-runs($converter as element(converter), $username as xs:string, $grouped as xs:boolean? := true()) as element(runs) {
+  admin:write-log('select runs for ' || $converter/@id || ', ' || $username ,'RUNS'),
+  if ($grouped)
+  then
     let $runs as element(run)* := tr:get-runs($converter),
         $allowed-runs := 
           for $run in $runs
@@ -203,16 +227,26 @@ admin:write-log('select runs for ' || $converter/@id || ', ' || $username ,'RUNS
           for $run in $allowed-runs
           where xs:boolean($run/status/text() eq 'pending')
           return $run
-  return
-    element runs {
-      element pending {
-        $pending-runs
-      },element running {
-        $running-runs
-      },element finished {
-        $finished-runs
+    return
+      element runs {
+        element pending {
+          $pending-runs
+        },element running {
+          $running-runs
+        },element finished {
+          $finished-runs
+        }
       }
-    }
+  else
+    let $runs as element(run)* := tr:get-runs($converter),
+        $allowed-runs := 
+          for $run in $runs
+          where tr:allowed($converter, $username,$run)
+          return $run
+    return 
+      element runs {
+        $allowed-runs
+      }
 };
 
 declare function tr:get-worker($worker-id as xs:string? := ()) as element(worker)* {
@@ -221,7 +255,7 @@ declare function tr:get-worker($worker-id as xs:string? := ()) as element(worker
     else $worker:worker
 };
 
-declare function tr:get-worker-status($worker as element(worker)) as xs:string? {
+declare function tr:get-worker-status($worker as element(worker)) as element(*) {
   worker:get-status($worker)
 };
 
@@ -251,22 +285,38 @@ declare function tr:system-memory() as element(mem){
     }
 };
 
+declare function tr:schedule-cpu() {
+  let $info := tokenize(proc:execute('mpstat',('-P', 'ALL','1','3'))/output,'\n')[matches(.,'^\d')],
+      $count := count($info),
+      $max-index := round($count div 3),
+      $names := tokenize($info[1],' '),
+      $store :=
+        store:put(
+          'current-cpu',
+          element cpu {
+            for $line in $info[position() ne 1][position() lt $max-index]
+              let $token := tokenize($line,' ')
+              return 
+              	element {'cpu' || $token[3]} {
+               	 for $name at $index in $names
+               	 where $index = (3 to 13)
+                  return
+                    element entry {
+                      attribute key {$name},
+                      attribute value {$token[$index]}
+                    }
+                }
+          }),
+      $job-ids := ('cpu-schedule0','cpu-schedule1'),
+      $running-jobs := job:list()[. = $job-ids],
+      $rerun := for $id in $job-ids where not($running-jobs = $id) return hf:eval($ns:tr,"tr:schedule-cpu()",{},map {'id':$id}) 
+  return $store
+};
+
 declare function tr:system-cpu() as element(cpu){
-  let $info := tokenize(proc:execute('mpstat',('-P', 'ALL'))/output,'\n')[matches(.,'^\d')],
-	$names := tokenize($info[1],' ')
-return 
-  element cpu {
-    for $line in $info[position() ne 1]
-      let $token := tokenize($line,' ')
-      return 
-      	element {'cpu' || $token[3]} {
-       	 for $name at $index in $names
-       	 where $index = (3 to 13)
-          return
-            element entry {
-              attribute key {$name},
-              attribute value {$token[$index]}
-            }
-        }
-  }
+  let $job-ids := ('cpu-schedule0','cpu-schedule1'),
+	    $job-running as xs:boolean := job:list() = $job-ids,
+	    $data := store:get('current-cpu'),
+	    $start-job :=  if ($job-running)then () else hf:eval($ns:tr,"tr:schedule-cpu()",{},map {'id':'cpu-schedule0'}) 
+return if (exists($data)) then $data else element cpu {}
 };
