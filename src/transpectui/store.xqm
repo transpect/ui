@@ -38,6 +38,14 @@ declare function st:get($prefix, $runid){
       return $parse
 };
 
+declare function st:delete($runid) {
+  if (store:keys() = $st:cache-key)
+  then st:delete-from-cache($runid)
+  else (st:rebuild-cache(), st:delete-from-cache($runid)),
+  
+  if (file:exists("/opt/data/runs/" || $runid)) then file:delete("/opt/data/runs/" || $runid, true()) else ()
+};
+
 declare function st:list($use-cache as xs:boolean? := true()) as xs:string* {
   if ($use-cache)
   then
@@ -67,7 +75,7 @@ declare function st:get-run-map($runid as xs:string) as map(xs:string, item()*){
       then
         map:build(
           file:list($path),
-          keys := fn { . },
+          key := fn { . },
           value := fn { st:get(.,$runid) }
         )
       else map {}
@@ -97,6 +105,12 @@ declare %private function st:set-in-cache($prefix as xs:string, $runid as xs:str
       $prev as map(*)? := $all[.?runid eq $runid],
       $new := if (exists($prev)) then map:put($prev,$prefix,$value) else map {$prefix: $value}
   return store:put($st:cache-key, ($rest,$new))
+};
+
+declare %private function st:delete-from-cache($runid as xs:string) {
+  let $all as map(*)* :=  store:get($st:cache-key),
+      $rest as map(*)* := $all[not(.?runid eq $runid)]
+  return store:put($st:cache-key, ($rest))
 };
 
 declare %private function st:get-from-cache($prefix, $runid) {

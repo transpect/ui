@@ -115,12 +115,20 @@ declare function tr:get-run($runid as xs:string, $converter as element(converter
   else make:get-run($runid)
 };
 
-declare function tr:start-run($file as map(xs:string, xs:base64Binary), $text-params as map(*)?, $converter as element(converter)?, $username as xs:string, $worker as element(worker)? := ()) {
+declare function tr:start-run($file as map(xs:string, xs:base64Binary), $text-params as map(*), $converter as element(converter), $username as xs:string, $worker as element(worker)? := ()) {
   if (exists($worker))
   then
     worker:convert($worker, $converter/xs:string(@id), $file, $text-params, $username)
   else
-    make:start-target-run('conversion', $converter, $text-params, $file, $username) 
+    make:start-target-run('conversion', $converter, $text-params, $file, $username)
+};
+
+declare function tr:delete-run($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) {
+  if (exists($worker))
+  then
+    worker:delete-run($worker, $converter/xs:string(@id), $run)
+  else
+    make:delete-run($run) 
 };
 
 declare function tr:stop-run($run as element(run), $username as xs:string? := 'admin', $converter as element(converter)? := (), $worker as element(worker)? := ()) {
@@ -270,7 +278,7 @@ declare function tr:get-local-converter($converter-id as xs:string? := ()) as el
 };
 
 declare function tr:system-memory() as element(mem){
-  let $lines := proc:execute("cat",'/proc/meminfo') ! tokenize(.,'\n')
+  let $lines as xs:string* := proc:execute("cat",'/proc/meminfo')?output ! tokenize(.,'\n')
   return 
     element mem {
       for $l in $lines

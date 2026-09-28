@@ -57,7 +57,7 @@ declare function make:start-target-run($targetname as xs:string, $converter as e
       $store := st:set('params', $runid, $parameters),
       $start-callback := $ns:store || " declare variable $job-id external; st:set('job-id', '" || $runid || "',$job-id), st:set('status', '" || $runid || "','running')",
       $end-callback := $ns:make || " declare variable $job-id external; make:store-job-messages('" || $runid || "'), make:store-job-errors('" || $runid || "')",
-      $queue-job :=
+      $queue-job as map(*) :=
         queue:register(
           $ns:store || " declare variable $parameters external;
                          declare variable $options external;
@@ -154,6 +154,14 @@ declare function make:stop-running-run($run as element(run)) as xs:boolean{
       $is-running := not(job:list() = $job-id),
       $set := st:set('status', $runid, 'canceled')
   return if ($is-running) then false() else true()
+};
+
+declare function make:delete-run($run as element(run)) as xs:boolean {
+  let $runid as xs:string := $run/runid,
+      $delete-store := st:delete($runid),
+      $data-path := $run/file ! replace(.,'/[^/]*$',''),
+      $delete-data := file:delete($data-path)
+  return not(file:exists($data-path))
 };
 
 declare function make:get-logs($runid){

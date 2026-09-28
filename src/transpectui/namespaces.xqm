@@ -13,6 +13,7 @@ declare variable $ns:ns     := "import module namespace ns = 'http://le-tex.de/n
 declare variable $ns:data   := "import module namespace data = 'http://le-tex.de/data' at '/opt/basex/webapp/transpectui/data.xqm';";
 declare variable $ns:user   := "import module namespace u = 'http://le-tex.de/user' at '/opt/basex/webapp/transpectui/user.xqm';";
 declare variable $ns:queue  := "import module namespace queue = 'http://le-tex.de/queue' at '/opt/basex/webapp/transpectui/queue.xqm';";
+declare variable $ns:global-queue  := "import module namespace global-queue = 'http://le-tex.de/global-queue' at '/opt/basex/webapp/transpectui/global-queue.xqm';";
 declare variable $ns:ui     := "import module namespace ui = 'http://le-tex.de/transpectui' at '/opt/basex/webapp/transpectui/transpectui.xqm';";
 declare variable $ns:tr     := "import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/transpectui/transpect.xqm';";
 declare variable $ns:worker := "import module namespace worker = 'http://le-tex.de/worker' at '/opt/basex/webapp/transpectui/worker.xqm';";

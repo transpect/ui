@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/openjdk/jdk:17-ubuntu
+FROM mcr.microsoft.com/openjdk/jdk:21-ubuntu
 
 ARG BASEX_ADMIN_PASSWORD
 
@@ -7,12 +7,12 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get -y install curl wget unzip emacs subversion git bash-completion make
+    apt-get -y install curl wget unzip emacs subversion git bash-completion make sysstat inotify-tools 
 
 ENV BASEX_DIR=/opt/basex
 ENV TRANSPECTDIR=/opt/transpect
 
-RUN svn checkout https://subversion.le-tex.de/common/basex11 $BASEX_DIR
+RUN svn checkout https://subversion.le-tex.de/common/basex13 $BASEX_DIR
 
 WORKDIR ${BASEX_DIR}
 
@@ -24,6 +24,7 @@ ENV APP_GID=90
 COPY docker/.basex $BASEX_DIR
 
 RUN ./bin/basex -c "ALTER PASSWORD admin $BASEX_ADMIN_PASSWORD "
+COPY scripts/entrypoint.sh $BASEX_DIR
 
 EXPOSE 8080
-CMD TIMEOUT=0 ./bin/basexhttp -h 8000 -s 8010
+CMD ${BASEX_DIR}/entrypoint.sh

@@ -135,6 +135,22 @@ function api:get-converter-run($converter-id as xs:string, $runid as xs:string ,
 };
 
 declare
+  %rest:DELETE
+  %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}")
+  %output:method("xml")
+function api:delete-converter-run($converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed as element(auth):= api:auth($headers),
+      $username := $authed/username,
+      $converter as element(converter)? := tr:get-local-converter($converter-id),
+      $run as element(run) := tr:get-run($runid)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then tr:delete-run($run, $converter)
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
   %rest:GET
   %rest:path("/api/{$lang}/converter/{$converter-id}/runs/{$runid}/logs")
   %output:method("xml")
@@ -353,6 +369,23 @@ function api:get-converter-run($worker-id as xs:string, $converter-id as xs:stri
   return 
     if (xs:boolean($authed/@allowed))
     then $run update {insert node $result-files into ., insert node element call-result {$job-messages} into .}
+    else api:error(i18n:val($authed/messages/text(),$lang))
+};
+
+declare
+  %rest:DELETE
+  %rest:path("/api/{$lang}/worker/{$worker-id}/converter/{$converter-id}/runs/{$runid}")
+  %output:method("xml")
+function api:del-converter-run($worker-id as xs:string, $converter-id as xs:string, $runid as xs:string ,$lang as xs:string){
+  let $headers as map(xs:string, xs:string*):= request:header-map(),
+      $authed := api:auth($headers),
+      $username := $authed/username,
+      $worker as element(worker)? := tr:get-worker($worker-id),
+      $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+      $run as element(run)? := tr:get-run($runid, $converter, $worker)
+  return 
+    if (xs:boolean($authed/@allowed))
+    then tr:delete-run($run, $converter, $worker)
     else api:error(i18n:val($authed/messages/text(),$lang))
 };
 
@@ -609,7 +642,7 @@ declare %private function api:auth($headers as map(xs:string, xs:string*)?, $all
             element auth {
               switch ($auth-header[1])
                 case 'Basic' return
-                  let $auth-decoded := convert:binary-to-string(xs:base64Binary($auth)) => tokenize(':'),
+                  let $auth-decoded := bin:decode-string(xs:base64Binary($auth)) => tokenize(':'),
                       $allow-use := xs:boolean($api:config/allow-basic-auth/text()) or $allowed-override
                   return (
                     attribute allowed {if ($allow-use) then u:validate-password($auth-decoded[1],$auth-decoded[2]) else false()},

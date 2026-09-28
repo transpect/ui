@@ -317,6 +317,18 @@ function ui:worker-converter-convert($worker-id as xs:string, $converter-id as x
       $text-params := map:remove(request:parameter-map(),'upload_file_uploaded_data'),
       $worker as element(worker)? := tr:get-worker($worker-id),
       $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
+      $prev-runs as element(run)* := tr:get-runs($converter),
+      $filename as xs:string := map:keys($file)[1],
+      $count as xs:integer := count($prev-runs[filename eq $filename]),
+      $max-prevs as xs:integer := (xs:integer($config:file/configurations/configuration/duplicate-files/@max),1)[1], 
+      $delete-prev-runs :=
+        if ($count ge $max-prevs)
+        then 
+          (for $run at $index in $prev-runs
+          order by $run/start
+          where $run/status eq 'stoppped'
+          return $run)[position() ge $max-prevs] ! tr:delete-run(., $converter, $worker)
+        else (),
       $run as element(run)? := tr:start-run($file, $text-params, $converter, ui:access-session('username'), $worker)
   return if ($run/error or not(exists($run)))
          then web:redirect(config:url('/' || $lang || '/worker/' || $worker-id || '/converter/' || $converter-id || '/error/' || $run/error)) 
@@ -1045,8 +1057,8 @@ declare function ui:build-runs-page($converter as element(converter), $context a
       $pending-runs :=
         for $run in $allowed-runs
         where xs:boolean($run/status/text() eq 'pending')
-        return $run(:,
-      $context := map:merge(($context, map {'refresh': 5})):)
+        return $run,
+      $context := map:merge(($context, map {'refresh': 5}))
   return
     ui:page(
       $context, 
@@ -1592,7 +1604,7 @@ declare function ui:stacked-bars($vals as map(*)*, $mem as xs:boolean, $class as
   element div {
     attribute class {'bar-diagram d-flex start ' || $class},
     let $all as xs:integer := sum($vals ! .?value),
-        $length as xs:decimal := max(($vals ! .?value))
+        $length as xs:decimal := xs:decimal(max(($vals ! .?value)))
     return (
       for $v in $vals
       let $name :=  $v?name,

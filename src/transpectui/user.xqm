@@ -146,7 +146,7 @@ declare function u:new-user($username as xs:string, $password as xs:string, $rol
 
 declare %private function u:create-new-user-object($username as xs:string, $password as xs:string? := (),  $roles as xs:string* := (),  $groups as xs:string* := ()) as (element(user)|element(error)){
   let $salt := random:uuid(),
-      $hashed := hash(concat($salt,($password,random:uuid())[1]),map:entry('algorithm','SHA-256')),
+      $hashed := hash(concat($salt,($password,random:uuid())[1]),'SHA-256'),
       $new-user :=  element user {
                       attribute source {'file'},
                       element username {$username},
@@ -174,7 +174,7 @@ declare %private function u:write-users-file($users) {
 declare function u:validate-password($username as xs:string, $password as xs:string) as xs:boolean {
   let $user := u:users-int($username),
       $salt := $user/salt/text(),
-      $hash := xs:string(hash(concat($salt,$password),map:entry('algorithm','SHA-256')))
+      $hash := xs:string(hash(concat($salt,$password),'SHA-256'))
   return xs:boolean(true() and $hash eq $user/password/text())
 };
 

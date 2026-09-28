@@ -56,7 +56,10 @@ declare
   %ws:close('/data') 
 function data:close() {
   hf:log('ws: ' || ws:id(), 'DICONNECT', $data:store-log-ws),
+  let $pg := store:get('ws:' || ws:id())?pageid
+  return store:remove('pg:' || $pg),
   store:remove('ws:' || ws:id()) (:CLEANUP:)
+  
 };
 
 declare

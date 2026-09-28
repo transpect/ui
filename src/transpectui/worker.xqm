@@ -78,11 +78,20 @@ declare function worker:get($worker as element(worker), $url as xs:string, $head
   return $result
 };
 
-declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $text-params, $username as xs:string? := 'transpectui') as element(run)?{
+declare function worker:delete($worker as element(worker), $url as xs:string, $header as map(*)?:= map {},$body as item()? := (), $override-media-type as xs:string? := ()) {
+  let $result := worker:request($worker/base-url || $url, for $k in map:keys($header) return <http:header name='{$k}' value='{$header?$k}'/>,$body,'delete',$override-media-type)
+  return $result
+};
+
+declare function worker:convert($worker as element(worker), $converter-id as xs:string, $file as map(xs:string, xs:base64Binary), $text-params as map(*), $username as xs:string? := 'transpectui') as (element(run)|xs:string){
   worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username, $text-params)[2]/run
 };
 
-declare function worker:post($worker as element(worker), $url as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string, $text-params) {
+declare function worker:delete-run($run as element(run), $worker as element(worker), $converter as element(converter)) as (element(run)|xs:string){
+  worker:delete($worker,string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid),'/'))[2]
+};
+
+declare function worker:post($worker as element(worker), $url as xs:string, $file as map(xs:string, xs:base64Binary), $username as xs:string, $text-params as map(*)) {
   let $header :=( 
         <http:header name='username' value='{$username}'/>,
         <http:multipart media-type='multipart/form-data'>

@@ -299,7 +299,7 @@ declare function hf:parameter-to-html($input as element(*), $lang as xs:string){
                 insert node attribute id {$sub-id} into .,
                 if ($index eq 1) then insert node attribute checked {} into .},
               element label {
-                attribute "for" {$sub-id},
+                attribute {'for'} {$sub-id},
                 $radio/xs:string(@name)
               }
            }

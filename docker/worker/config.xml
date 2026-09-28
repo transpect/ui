@@ -3,6 +3,9 @@
   <configuration>
     <data-dir-base>/opt/data</data-dir-base>
     <base-url></base-url>
+    <floormanager>
+      <base-url>http://floormanager:8000</base-url>
+    </floormanager>
     <api>
       <allow-basic-auth>false</allow-basic-auth>
       <allow-bearer-auth>true</allow-bearer-auth>
