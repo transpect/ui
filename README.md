@@ -12,7 +12,7 @@ BaseX based UI for transpect converters. Currently uses BaseX 13.
 * Queuing
 * User-Managment
 * API
-* (new) FloorPlanner - enables a global queue
+* (new) FloorManager - enables a global queue
 
 ### Missing Features
 
