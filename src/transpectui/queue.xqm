@@ -97,7 +97,7 @@ declare %private function queue:start-job($job as map(*)) as xs:string? {
       $store := store:put('job',$job),
       $compose-query := $job?query || hf:static-replace-variables(", job:eval($callback, {'job-id': $job-id},{'id':$id})",map {'callback':$job?end-callback, 'job-id':$job-id,'id':'end-callback of ' || $job-id},'"')[$job?end-callback],
       $log := queue:log($compose-query),
-      $start := job:eval($compose-query, $job?parameter, map {'id':$job-id}),
+      $start := job:eval($compose-query, $job?parameter, map {'id':$job-id, 'cache':true()}),
       $log := queue:log('Start Job ' || $job?queue-id || ' as ' || $job-id),
       $add-to-running := queue:add-to-running($job-id),
       $request-global := queue:floormanager-request($job-id),
@@ -144,8 +144,8 @@ declare %private function queue:add($job-map as map(*)) {
   then 
     store:put($queue:key,array:append(store:get($queue:key),$job-map))
   else
-    store:put($queue:key,array:build($job-map)),
-  queue:floormanager-add($job-map)
+    store:put($queue:key,array:build($job-map))(:,
+  queue:floormanager-add($job-map):)
 };
 
 (: Remove all jobs :)
@@ -181,7 +181,7 @@ declare function queue:floormanager-free($id as xs:string) as xs:boolean {
 };
 
 declare function queue:floormanager-add($job-map as map(*)){
-  ()
+  queue:floormanager-call-txt('register/' || $job-map?queue-id, true())
 };
 
 declare function queue:floormanager-call-base($path, $header := (), $body as item()* := (), $method as xs:string := 'get', $override-media-type as xs:string? := ()) {

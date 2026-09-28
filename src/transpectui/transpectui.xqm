@@ -1012,33 +1012,6 @@ declare function ui:empty-run-info($tag, $lang) {
   }
 };
 
-(:declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
-  ui:check($context?right, $context?lang, $context?return-url),
-  let $call := string-join((xs:string($converter/@worker),xs:string($converter/@id),$context?username),'|')
-  return
-    ui:page(
-      $context,
-      element div {
-          attribute class {'well'},
-          element div {
-            attribute class {'date spacious'},
-            i18n:val('called',$context?lang) || ': ' || hf:format-dateTime(current-dateTime())
-          },
-          element div {
-            attribute class {'well'},
-            <div class="run-info line template" data-template-call="{$call}">
-              <div class="run-info running" data-content-path="/@status">Laden...<a data-href-path="/@path" title="Ergebnisse">Ergebnisse</a></div>
-              <div class="run-info runid" data-content-path="/runid/text()">Laden...</div>
-              <div class="run-info starttime" data-content-path="/@started">Laden...</div>
-              <div class="run-info file" data-content-path="/filename">Laden...</div>
-              <div class="run-info username" data-content-path="/username">Laden...</div>
-              <div class="run-info username" data-content-path="/worker">Laden...</div>
-            </div>
-          }
-        }
-    )
-};:)
-
 declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
   ui:check($context?right, $context?lang, $context?return-url),
   let $runs as element(run)* := tr:get-runs($converter),

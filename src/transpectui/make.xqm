@@ -85,10 +85,10 @@ declare function make:store-job-messages($run as element(run)) as xs:string*{
       $state := if ($job-id) then job:list-details($job-id)/xs:string(@state) else 'not-found',
       $messages := 
         if ($state eq 'cached')
-        then job:result($job-id,map {'keep':true()})[1]/output/text() ! tokenize(.,'\n')
+        then job:result($job-id,map {'keep':true()})[1]?output ! tokenize(.,'\n')
         else st:get('job-results',$runid),
       $store := if ($state eq 'cached')
-        then st:set('job-results',$runid, $messages)
+        then (hf:log('set job-results for ' || $runid,'STORE'), st:set('job-results',$runid, $messages))
         else ()
   return $messages
 };
