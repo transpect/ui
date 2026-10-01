@@ -158,6 +158,7 @@ declare function make:stop-running-run($run as element(run)) as xs:boolean{
 
 declare function make:delete-run($run as element(run)) as xs:boolean {
   let $runid as xs:string := $run/runid,
+      $log := hf:log('Delete run: ' || $runid,'DELRUN'),
       $delete-store := st:delete($runid),
       $data-path := $run/file ! replace(.,'/[^/]*$',''),
       $delete-data := file:delete($data-path)

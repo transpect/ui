@@ -259,6 +259,14 @@ declare variable $i18n:static-replacements :=
       <replacement lang="de">Information zu Konvertern: /api/de/converter oder eines bestimmten Konverters: /api/de/converter/CONVERTER-ID</replacement>
       <replacement lang="en">Get Information about converters: /api/de/converter or of a specific converter: /api/en/converter/CONVERTER-ID</replacement>
     </static-replacement>
+    <static-replacement tag="dragDrop">
+      <replacement lang="de">Ziehen Sie eine Datei hierher</replacement>
+      <replacement lang="en">Drag and drop your file here</replacement>
+    </static-replacement>
+    <static-replacement tag="clickToChoose">
+      <replacement lang="de">oder klicken Sie um eine Datei auszuwählen</replacement>
+      <replacement lang="en">or click to choose a file</replacement>
+    </static-replacement>
   </static-replacements>;
 
 declare function i18n:val($tag, $lang) {

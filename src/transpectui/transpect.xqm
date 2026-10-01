@@ -124,9 +124,10 @@ declare function tr:start-run($file as map(xs:string, xs:base64Binary), $text-pa
 };
 
 declare function tr:delete-run($run as element(run), $converter as element(converter), $worker as element(worker)? := ()) {
+  hf:log('delete run: ' || $run/runid/text(),'DELRUN'),
   if (exists($worker))
   then
-    worker:delete-run($worker, $converter/xs:string(@id), $run)
+    worker:delete-run($worker, $converter, $run)
   else
     make:delete-run($run) 
 };
@@ -297,13 +298,13 @@ declare function tr:schedule-cpu() {
   let $info := tokenize(proc:execute('mpstat',('-P', 'ALL','1','3'))/output,'\n')[matches(.,'^\d')],
       $count := count($info),
       $max-index := round($count div 3),
-      $names := tokenize($info[1],' '),
+      $names := tokenize($info[1],' ')[normalize-space(.)],
       $store :=
         store:put(
           'current-cpu',
           element cpu {
             for $line in $info[position() ne 1][position() lt $max-index]
-              let $token := tokenize($line,' ')
+              let $token := tokenize($line,' ')[normalize-space(.)]
               return 
               	element {'cpu' || $token[3]} {
                	 for $name at $index in $names

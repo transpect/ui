@@ -87,7 +87,7 @@ declare function worker:convert($worker as element(worker), $converter-id as xs:
   worker:post($worker,'/api/en/converter/' || $converter-id, $file, $username, $text-params)[2]/run
 };
 
-declare function worker:delete-run($run as element(run), $worker as element(worker), $converter as element(converter)) as (element(run)|xs:string){
+declare function worker:delete-run($worker as element(worker), $converter as element(converter), $run as element(run)) as (element(run)|xs:string){
   worker:delete($worker,string-join(('','api','en','converter', $converter/@id, 'runs', $run/runid),'/'))[2]
 };
 

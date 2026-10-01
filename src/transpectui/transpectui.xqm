@@ -320,13 +320,15 @@ function ui:worker-converter-convert($worker-id as xs:string, $converter-id as x
       $prev-runs as element(run)* := tr:get-runs($converter),
       $filename as xs:string := map:keys($file)[1],
       $count as xs:integer := count($prev-runs[filename eq $filename]),
+      
+      $log := hf:log('Convert file: ' || $filename || ' Delete: ' || xs:string($count),'CONVERT'),
       $max-prevs as xs:integer := (xs:integer($config:file/configurations/configuration/duplicate-files/@max),1)[1], 
       $delete-prev-runs :=
         if ($count ge $max-prevs)
         then 
-          (for $run at $index in $prev-runs
+          (for $run in $prev-runs
           order by $run/start
-          where $run/status eq 'stoppped'
+          where $run/status = ( 'stopped','canceled')
           return $run)[position() ge $max-prevs] ! tr:delete-run(., $converter, $worker)
         else (),
       $run as element(run)? := tr:start-run($file, $text-params, $converter, ui:access-session('username'), $worker)
@@ -1271,7 +1273,28 @@ declare function ui:build-converter-page($converter as element(converter), $cont
             element label {
               i18n:val("upload",$context?lang)
             },
-            element input {
+            element label {
+              attribute class {'file-drop'},
+              attribute id {'dropZone'},
+              element input {
+                attribute type {'file'},
+                attribute id {'fileInput'},
+                attribute name {'upload_file_uploaded_data'},
+                element div {
+                  attribute class {'file-content'},
+                  element p {
+                    attribute class {'file-title'},
+                    i18n:val('dragDrop',$context?lang)
+                  },
+                  element p {
+                    attribute class {'file-name'},
+                    attribute id {'fileName'},
+                    i18n:val('clickToChoose',$context?lang)
+                  }
+                }
+              }
+            },
+            (:element input {
               attribute type {'text'},
               attribute required {''},
               attribute readonly {''},
@@ -1287,7 +1310,7 @@ declare function ui:build-converter-page($converter as element(converter), $cont
               attribute id {'upload_file_uploaded_data'},
               attribute name {'upload_file_uploaded_data'},
               attribute class {'hidden'}
-            },
+            },:)
             element button {
               attribute id {'submit-to-conversion'},
               attribute disabled {},

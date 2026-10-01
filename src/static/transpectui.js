@@ -5,6 +5,7 @@ const serializer = new XMLSerializer();
 let intentionalClose = false;
 let username;
 
+
 window.addEventListener('load', init, false)
 window.addEventListener('load',wsInit,false)
 window.addEventListener('pagehide',wsUnload,false)
@@ -15,33 +16,62 @@ function wsUnload() {
   intentionalClose = false;
 }
 
+function showFile(file) {
+  if (!file) return;
+  
+  const fileName = document.getElementById("fileName");
+  fileName.textContent = file.name;
+  fileName.classList.add("selected");
+}
+
 function init() {
   console.log('init...');
   username = document.querySelector('a.username')?.title;
-  var hiddenFileInput = document.getElementById('upload_file_uploaded_data');
-  if (hiddenFileInput) {
-    hiddenFileInput.addEventListener("change", event => {
-      const target = event.target;
-      const filename = target.value;
-      var display = document.getElementById('file-name');
-      var submitBtn = document.getElementById('submit-to-conversion');
-      console.log(filename);
-      console.log(display);
-      display.value = filename;
-      if (filename) {
+  
+  const dropZone = document.getElementById("dropZone");
+  const fileInput = document.getElementById("fileInput");
+  const fileName = document.getElementById("fileName");
+  var submitBtn = document.getElementById('submit-to-conversion');
+  if (fileInput) {
+    fileInput.addEventListener("change", () => {
+      console.log(fileInput.files);
+      showFile(fileInput.files[0]);
+      if (fileInput.files.length > 0) {
         submitBtn.removeAttribute('disabled');
         submitBtn.classList.remove('disabled');
-        display.classList.remove('invalid');
-        display.classList.add('valid');
       } else {
         submitBtn.setAttribute('disabled','');
         submitBtn.classList.add('disabled');
-        display.classList.add('invalid');
-        display.classList.remove('valid');
       }
-    })
+    });
   }
+  if (dropZone) {
+    
+    dropZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      dropZone.classList.add("dragover");
+    });
   
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("dragover");
+    });
+  
+    dropZone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("dragover");
+  
+      const file = event.dataTransfer.files[0];
+  
+      if (file) {
+        // Keep the dropped file in the actual input.
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        fileInput.files = dataTransfer.files;
+  
+        showFile(file);
+      }
+    }); 
+  }
   var actionButtons = document.querySelectorAll('input[type="button"][data-href]')
   actionButtons.forEach(button => {
     button.addEventListener('click', (event) => runAction(event.target))
