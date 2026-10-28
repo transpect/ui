@@ -1,6 +1,6 @@
 module namespace st = 'http://le-tex.de/store';
 
-import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
 
 declare variable $st:cache-key := 'st:cache';
 declare variable $st:cache-age-key := $st:cache-key || '_timestamp';

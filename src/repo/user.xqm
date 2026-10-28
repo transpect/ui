@@ -7,8 +7,8 @@ module namespace u = 'http://le-tex.de/user';
  :)
 
 declare variable $u:token-max-age := 3600000;
-declare variable $u:users-file := '/opt/basex/webapp/transpectui/users.xml';
-declare variable $u:roles-file := '/opt/basex/webapp/transpectui/roles.xml';
+declare variable $u:users-file := '/opt/basex/install/transpectui/users.xml';
+declare variable $u:roles-file := '/opt/basex/install/transpectui/roles.xml';
 declare variable $u:default-roles := 
   <roles>
     <role name="admin">

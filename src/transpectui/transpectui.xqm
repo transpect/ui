@@ -1,11 +1,11 @@
 module namespace ui  = 'http://le-tex.de/transpectui';
-import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
-import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
-import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
-import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
-import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
-import module namespace tr = 'http://le-tex.de/transpect' at 'transpect.xqm';
-import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
+import module namespace conv = 'http://le-tex.de/converter';
+import module namespace config = 'http://le-tex.de/config';
+import module namespace hf = 'http://le-tex.de/helper-functions';
+import module namespace i18n = 'http://le-tex.de/i18n';
+import module namespace u = 'http://le-tex.de/user';
+import module namespace tr = 'http://le-tex.de/transpect';
+import module namespace ns = 'http://le-tex.de/namespaces';
 
 declare function ui:check($right as xs:string?, $lang as xs:string, $return-url as xs:string?, $owner as xs:string? := ()){
   let $is-logged-in := exists(ui:access-session('username')),
@@ -181,6 +181,21 @@ function ui:admin($lang as xs:string){
               
               ),
               false(),'small', false())
+          }
+        }
+      },
+    element div {
+      attribute class {'well'},
+      for $worker in $config:file//controller/worker
+      return
+        element div {
+          attribute class {'well'},
+          element h3 {'Name: ' || $worker/xs:string(@name)},
+          element div {
+            element span {'id: ' || $worker/xs:string(@id)}
+          },
+          element div {
+            element span {'internal url: ' || $worker/base-url/text()}
           }
         }
       }

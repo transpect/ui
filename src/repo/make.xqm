@@ -7,7 +7,7 @@ import module namespace i18n = 'http://le-tex.de/i18n' at 'i18n.xqm';
 import module namespace st = 'http://le-tex.de/store' at 'store.xqm';
 import module namespace queue = 'http://le-tex.de/queue' at 'queue.xqm';
 import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
-import module namespace tr = 'http://le-tex.de/transpect' at '/opt/basex/webapp/transpectui/transpect.xqm';
+import module namespace tr = 'http://le-tex.de/transpect' at 'transpect.xqm';
 
 (: 
  : wrapper module for the orchestration of conversion runs.

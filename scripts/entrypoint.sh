@@ -2,12 +2,9 @@
 
 set -u
 
+/opt/basex/bin/basex -c "XQUERY import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/install/transpectui/namespaces.xqm'; ns:install()" >> /opt/basex/install.txt
+
 ./bin/basexhttp -h 8000 -s 8010
-
-#sleep 2
-
-#WEBAPP_DIR="/opt/basex/webapp/transpectui"
-#LOG_FILE="/opt/basex/install.log"
 #INTERVAL=1
 
 #declare -A FILE_TIMES

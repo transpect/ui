@@ -25,8 +25,8 @@ COPY docker/.basex $BASEX_DIR
 
 RUN ./bin/basex -c "ALTER PASSWORD admin $BASEX_ADMIN_PASSWORD "
 COPY src/floormanager $BASEX_DIR/webapp/transpectui
-COPY src/transpectui/config.xqm $BASEX_DIR/webapp/transpectui
-COPY src/transpectui/config.xml $BASEX_DIR/webapp/transpectui
+COPY src/repo/config.xqm $BASEX_DIR/install/transpectui/
+COPY src/repo/config.xml $BASEX_DIR/install/transpectui/
 COPY scripts/entrypoint.sh $BASEX_DIR
 
 EXPOSE 8080

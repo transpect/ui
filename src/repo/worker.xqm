@@ -1,7 +1,7 @@
 module namespace worker = 'http://le-tex.de/worker';
 
-import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
-import module namespace config = 'http://le-tex.de/config' at '/opt/basex/webapp/transpectui/config.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
+import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
 
 declare variable $worker:worker := $config:file/configurations/configuration/controller/worker;
 declare variable $worker:is-controller := $config:file/configurations/configuration/controller/activated eq "true";

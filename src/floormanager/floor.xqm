@@ -1,5 +1,5 @@
 module namespace f = 'http://le-tex.de/floor';
-import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
+import module namespace config = 'http://le-tex.de/config' at '../../install/transpectui/config.xqm';
 
 declare variable $f:config := $config:file/configurations/configuration/global-queue;
 declare variable $f:global-queue-size := ($f:config/global-queue/xs:string(@size),'5')[1];

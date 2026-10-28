@@ -3,8 +3,8 @@ import module namespace u = 'http://le-tex.de/user' at 'user.xqm';
 import module namespace make = 'http://le-tex.de/make' at 'make.xqm';
 import module namespace worker = 'http://le-tex.de/worker' at 'worker.xqm';
 import module namespace conv = 'http://le-tex.de/converter' at 'converter.xqm';
-import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
-import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
+import module namespace ns = 'http://le-tex.de/namespaces' at 'namespaces.xqm';
 
 declare variable $tr:rights-map :=
   map {
