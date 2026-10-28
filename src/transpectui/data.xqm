@@ -2,8 +2,8 @@
 
 module namespace data = 'http://le-tex.de/data';
 
-import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
-import module namespace ns = 'http://le-tex.de/namespaces' at '/opt/basex/webapp/transpectui/namespaces.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
+import module namespace ns = 'http://le-tex.de/namespaces' at 'namespaces.xqm';
 
 declare variable $data:use-search-cache := false();
 declare variable $data:use-object-cache := false();

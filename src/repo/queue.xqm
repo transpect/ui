@@ -2,7 +2,7 @@ module namespace queue = 'http://le-tex.de/queue';
 
 import module namespace ns = 'http://le-tex.de/namespaces' at 'namespaces.xqm';
 import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
-import module namespace hf = 'http://le-tex.de/helper-functions' at '/opt/basex/webapp/transpectui/helper-functions.xqm';
+import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
 (: 
  : queue for simultaniously running calls.
  :)

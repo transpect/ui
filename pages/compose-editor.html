@@ -1,0 +1,3552 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Compose-Editor – docker-compose.yml grafisch erstellen</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+        <style>
+            :root {
+                --bg: #e9edf1;
+                --panel: #ffffff;
+                --sunk: #f3f5f8;
+                --ink: #17212b;
+                --muted: #5b6878;
+                --line: #cbd4dd;
+                --steel: #2b5d7a;
+                --steel-dark: #1e465d;
+                --steel-ink: #ffffff;
+                --signal: #b57a05;
+                --signal-soft: #fcefc9;
+                --danger: #b0352b;
+                --danger-soft: #f8deda;
+                --code-bg: #12273a;
+                --code-ink: #d6e2ec;
+                --code-key: #8ec3e6;
+                --code-str: #e9c46a;
+                --code-num: #b3dfa6;
+                --code-dim: #6f8799;
+                --sans:
+                    "IBM Plex Sans", "Segoe UI", system-ui, -apple-system,
+                    sans-serif;
+                --mono:
+                    "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas,
+                    monospace;
+                color-scheme: light dark;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #10161c;
+                    --panel: #18212a;
+                    --sunk: #131a21;
+                    --ink: #e1e7ed;
+                    --muted: #93a1b0;
+                    --line: #2c3946;
+                    --steel: #4f8db0;
+                    --steel-dark: #3a6f8d;
+                    --steel-ink: #0d1820;
+                    --signal: #e2ad3a;
+                    --signal-soft: #3a2f14;
+                    --danger: #e36e62;
+                    --danger-soft: #3b1f1c;
+                    --code-bg: #0b1621;
+                }
+            }
+            * {
+                box-sizing: border-box;
+            }
+            html,
+            body {
+                height: 100%;
+            }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--ink);
+                font: 15px/1.45 var(--sans);
+            }
+            button,
+            input,
+            select,
+            textarea {
+                font: inherit;
+                color: inherit;
+            }
+            :focus-visible {
+                outline: 2px solid var(--signal);
+                outline-offset: 2px;
+            }
+
+            /* ---------- Kopfzeile ---------- */
+            .top {
+                display: flex;
+                align-items: center;
+                gap: 20px;
+                flex-wrap: wrap;
+                padding: 12px 20px;
+                background: var(--panel);
+                border-bottom: 1px solid var(--line);
+            }
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .brand h1 {
+                font-size: 18px;
+                font-weight: 700;
+                margin: 0;
+                letter-spacing: -0.01em;
+            }
+            .brand svg {
+                flex: none;
+            }
+            .proj {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 13px;
+                color: var(--muted);
+            }
+            .proj input {
+                width: 190px;
+            }
+            .actions {
+                margin-left: auto;
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                border: 1px solid var(--line);
+                background: var(--panel);
+                padding: 6px 12px;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .btn:hover {
+                border-color: var(--steel);
+            }
+            .btn.primary {
+                background: var(--steel);
+                border-color: var(--steel);
+                color: var(--steel-ink);
+                font-weight: 600;
+            }
+            .btn.primary:hover {
+                background: var(--steel-dark);
+            }
+            .btn.danger {
+                color: var(--danger);
+            }
+            .btn.danger:hover {
+                border-color: var(--danger);
+            }
+            .btn.small {
+                padding: 3px 8px;
+                font-size: 13px;
+            }
+            .icon-btn {
+                border: 1px solid transparent;
+                background: none;
+                cursor: pointer;
+                width: 28px;
+                height: 28px;
+                border-radius: 3px;
+                color: var(--muted);
+                flex: none;
+                font-size: 16px;
+                line-height: 1;
+            }
+            .icon-btn:hover {
+                border-color: var(--line);
+                color: var(--danger);
+            }
+
+            input[type="text"],
+            input:not([type]),
+            select,
+            textarea {
+                background: var(--sunk);
+                border: 1px solid var(--line);
+                border-radius: 3px;
+                padding: 5px 8px;
+                width: 100%;
+                min-width: 0;
+            }
+            input:focus,
+            select:focus,
+            textarea:focus {
+                border-color: var(--steel);
+                outline: none;
+                box-shadow: 0 0 0 2px
+                    color-mix(in srgb, var(--steel) 25%, transparent);
+            }
+            .mono {
+                font-family: var(--mono);
+                font-size: 13px;
+            }
+            textarea {
+                resize: vertical;
+                min-height: 70px;
+                font-family: var(--mono);
+                font-size: 13px;
+            }
+            input.invalid {
+                border-color: var(--danger);
+                background: var(--danger-soft);
+            }
+
+            /* ---------- Layout ---------- */
+            .layout {
+                display: grid;
+                grid-template-columns: 240px minmax(0, 1fr) 400px;
+                height: calc(100% - 59px);
+                min-height: 560px;
+            }
+            .layout > * {
+                min-height: 0;
+                overflow: auto;
+            }
+
+            /* ---------- Palette ---------- */
+            .palette {
+                background: var(--panel);
+                border-right: 1px solid var(--line);
+                padding: 14px 12px 24px;
+            }
+            .palette input {
+                margin-bottom: 10px;
+            }
+            .palette h2 {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--muted);
+                margin: 16px 4px 6px;
+            }
+            .palette h2:first-of-type {
+                margin-top: 6px;
+            }
+            .brick {
+                display: block;
+                width: 100%;
+                text-align: left;
+                cursor: grab;
+                background: none;
+                border: 1px solid transparent;
+                border-radius: 3px;
+                padding: 6px 8px 6px 12px;
+                position: relative;
+            }
+            .brick::before {
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 7px;
+                bottom: 7px;
+                width: 4px;
+                border-radius: 1px;
+                background: repeating-linear-gradient(
+                    180deg,
+                    var(--steel) 0 3px,
+                    transparent 3px 5px
+                );
+                opacity: 0.55;
+            }
+            .brick:hover {
+                background: var(--sunk);
+                border-color: var(--line);
+            }
+            .brick:hover::before {
+                opacity: 1;
+            }
+            .brick:active {
+                cursor: grabbing;
+            }
+            .brick b {
+                display: block;
+                font-weight: 600;
+                font-size: 14px;
+            }
+            .brick span {
+                display: block;
+                font-size: 12px;
+                color: var(--muted);
+                font-family: var(--mono);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            /* ---------- Arbeitsfläche ---------- */
+            .stage {
+                padding: 18px 24px 40px;
+            }
+            .stage-head {
+                display: flex;
+                align-items: baseline;
+                gap: 12px;
+                flex-wrap: wrap;
+                margin-bottom: 12px;
+            }
+            .stage-head h2 {
+                margin: 0;
+                font-size: 20px;
+                font-weight: 700;
+            }
+            .stage-head .hint {
+                margin: 0;
+            }
+            .hint {
+                color: var(--muted);
+                font-size: 13px;
+            }
+            .legend {
+                margin-left: auto;
+                display: flex;
+                gap: 16px;
+                font-size: 12px;
+                color: var(--muted);
+                align-items: center;
+            }
+            .legend svg {
+                vertical-align: middle;
+                margin-right: 4px;
+            }
+
+            .board {
+                position: relative;
+                min-height: 260px;
+                border: 1.5px dashed var(--line);
+                border-radius: 4px;
+                padding: 28px;
+                background-color: var(--bg);
+                background-image: radial-gradient(
+                    color-mix(in srgb, var(--muted) 22%, transparent) 1px,
+                    transparent 1px
+                );
+                background-size: 18px 18px;
+            }
+            .board.drag-over {
+                border-color: var(--signal);
+                background-color: var(--signal-soft);
+            }
+            .board svg.links {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 0;
+                overflow: visible;
+            }
+            .tiles {
+                position: relative;
+                z-index: 1;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+                gap: 46px 52px;
+            }
+            .board-empty {
+                position: relative;
+                z-index: 1;
+                text-align: center;
+                padding: 60px 10px;
+                color: var(--muted);
+            }
+            .board-empty strong {
+                display: block;
+                color: var(--ink);
+                font-size: 16px;
+                margin-bottom: 4px;
+            }
+
+            .tile {
+                display: block;
+                width: 100%;
+                text-align: left;
+                cursor: pointer;
+                padding: 0;
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 3px;
+                overflow: hidden;
+                position: relative;
+            }
+            .tile:hover {
+                border-color: var(--steel);
+            }
+            .tile.selected {
+                border-color: var(--signal);
+                box-shadow: 0 0 0 2px var(--signal);
+            }
+            .tile-ribs {
+                display: block;
+                height: 14px;
+                background: var(--steel);
+                background-image: repeating-linear-gradient(
+                    90deg,
+                    transparent 0 7px,
+                    var(--steel-dark) 7px 9px
+                );
+            }
+            .tile.selected .tile-ribs {
+                background-color: var(--signal);
+                background-image: repeating-linear-gradient(
+                    90deg,
+                    transparent 0 7px,
+                    color-mix(in srgb, var(--signal) 70%, #000) 7px 9px
+                );
+            }
+            .tile-body {
+                display: block;
+                padding: 10px 12px 12px;
+            }
+            .tile-name {
+                display: block;
+                font-weight: 700;
+                font-size: 16px;
+                word-break: break-all;
+            }
+            .tile-img {
+                display: block;
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--muted);
+                word-break: break-all;
+                margin-top: 1px;
+            }
+            .tile-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                margin-top: 9px;
+            }
+            .chip {
+                font-family: var(--mono);
+                font-size: 11.5px;
+                padding: 1px 6px;
+                border-radius: 2px;
+                background: var(--sunk);
+                border: 1px solid var(--line);
+                color: var(--ink);
+                white-space: nowrap;
+            }
+            .chip.port {
+                border-color: color-mix(in srgb, var(--steel) 45%, var(--line));
+            }
+            .tile-flag {
+                position: absolute;
+                top: 20px;
+                right: 8px;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 0 6px;
+                border-radius: 2px;
+                background: var(--danger-soft);
+                color: var(--danger);
+            }
+            .tile-flag.warn {
+                background: var(--signal-soft);
+                color: var(--signal);
+            }
+            @keyframes landed {
+                from {
+                    transform: translateY(-6px);
+                    opacity: 0;
+                }
+                to {
+                    transform: none;
+                    opacity: 1;
+                }
+            }
+            .tile.landed {
+                animation: landed 0.22s ease-out;
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .tile.landed {
+                    animation: none;
+                }
+            }
+
+            /* ---------- Ressourcen ---------- */
+            .resources {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-top: 26px;
+            }
+            .res {
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 3px;
+                padding: 12px 14px 14px;
+            }
+            .res h3 {
+                margin: 0 0 2px;
+                font-size: 15px;
+            }
+            .res .hint {
+                margin: 0 0 10px;
+            }
+            .res-row {
+                display: grid;
+                grid-template-columns: 1.2fr 1fr auto auto;
+                gap: 6px;
+                align-items: center;
+                margin-bottom: 6px;
+            }
+            .res-row label {
+                font-size: 12px;
+                color: var(--muted);
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                white-space: nowrap;
+            }
+            .res-used {
+                grid-column: 1 / -1;
+                font-size: 12px;
+                color: var(--muted);
+                margin: -2px 0 6px;
+            }
+
+            /* ---------- Prüfung ---------- */
+            .issues {
+                margin-top: 20px;
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 3px;
+                padding: 12px 14px;
+            }
+            .issues h3 {
+                margin: 0 0 6px;
+                font-size: 15px;
+            }
+            .issues ul {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+            }
+            .issues li {
+                display: flex;
+                gap: 8px;
+                padding: 4px 0;
+                font-size: 14px;
+                border-top: 1px solid var(--line);
+            }
+            .issues li:first-child {
+                border-top: 0;
+            }
+            .issues li button {
+                background: none;
+                border: 0;
+                padding: 0;
+                text-align: left;
+                cursor: pointer;
+                color: inherit;
+            }
+            .issues li button:hover {
+                text-decoration: underline;
+            }
+            .lvl {
+                flex: none;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 1px 6px;
+                border-radius: 2px;
+                align-self: flex-start;
+                margin-top: 2px;
+            }
+            .lvl.error {
+                background: var(--danger-soft);
+                color: var(--danger);
+            }
+            .lvl.warn {
+                background: var(--signal-soft);
+                color: var(--signal);
+            }
+            .issues .ok {
+                color: var(--muted);
+                font-size: 14px;
+                margin: 0;
+            }
+
+            /* ---------- Seitenleiste ---------- */
+            .side {
+                background: var(--panel);
+                border-left: 1px solid var(--line);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .tabs {
+                display: flex;
+                border-bottom: 1px solid var(--line);
+                flex: none;
+            }
+            .tab {
+                flex: 1;
+                padding: 10px 12px;
+                background: none;
+                border: 0;
+                border-bottom: 3px solid transparent;
+                cursor: pointer;
+                font-weight: 600;
+                color: var(--muted);
+            }
+            .tab[aria-selected="true"] {
+                color: var(--ink);
+                border-bottom-color: var(--steel);
+            }
+            .panel {
+                flex: 1;
+                overflow: auto;
+                min-height: 0;
+            }
+            .panel[hidden] {
+                display: none;
+            }
+            #inspector {
+                padding: 14px 16px 30px;
+            }
+            #inspector h3 {
+                margin: 0 0 12px;
+                font-size: 17px;
+            }
+            .group {
+                border-top: 1px solid var(--line);
+                padding: 12px 0 4px;
+            }
+            .group:first-of-type {
+                border-top: 0;
+                padding-top: 0;
+            }
+            .group > h4 {
+                margin: 0 0 8px;
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .field {
+                display: block;
+                margin-bottom: 10px;
+            }
+            .field > span {
+                display: block;
+                font-size: 12.5px;
+                color: var(--muted);
+                margin-bottom: 3px;
+            }
+            .row {
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                margin-bottom: 6px;
+            }
+            .row.env > input:first-child {
+                flex: 0 0 42%;
+            }
+            .dep-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 6px;
+            }
+            .dep-row label {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-width: 0;
+            }
+            .dep-row select {
+                width: auto;
+                max-width: 52%;
+                font-size: 13px;
+            }
+            .check {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                margin-bottom: 4px;
+            }
+            details.group summary {
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 8px;
+            }
+            .grid3 {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            .insp-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                border-top: 1px solid var(--line);
+                padding-top: 14px;
+                margin-top: 6px;
+            }
+            .insp-actions .btn.danger {
+                margin-left: auto;
+            }
+
+            #yamlPanel {
+                background: var(--code-bg);
+            }
+            .yaml-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 14px;
+                color: var(--code-dim);
+                font-size: 12.5px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                position: sticky;
+                top: 0;
+                background: var(--code-bg);
+            }
+            .yaml-bar .btn {
+                background: transparent;
+                color: var(--code-ink);
+                border-color: rgba(255, 255, 255, 0.2);
+            }
+            pre.yaml {
+                margin: 0;
+                padding: 14px 16px 40px;
+                color: var(--code-ink);
+                font: 13px/1.6 var(--mono);
+                white-space: pre;
+                tab-size: 2;
+            }
+            .y-key {
+                color: var(--code-key);
+            }
+            .y-str {
+                color: var(--code-str);
+            }
+            .y-num {
+                color: var(--code-num);
+            }
+            .y-dash,
+            .y-com {
+                color: var(--code-dim);
+            }
+
+            /* ---------- Meldung ---------- */
+            .toast {
+                position: fixed;
+                left: 50%;
+                bottom: 22px;
+                transform: translateX(-50%);
+                background: var(--ink);
+                color: var(--panel);
+                padding: 8px 16px;
+                border-radius: 3px;
+                font-size: 14px;
+                z-index: 50;
+                max-width: min(640px, 92vw);
+            }
+            .toast[hidden] {
+                display: none;
+            }
+
+            /* ---------- Schmale Viewports ---------- */
+            @media (max-width: 1180px) {
+                .layout {
+                    grid-template-columns: 220px minmax(0, 1fr);
+                    grid-template-rows: auto auto;
+                    height: auto;
+                }
+                .side {
+                    grid-column: 1 / -1;
+                    border-left: 0;
+                    border-top: 1px solid var(--line);
+                    max-height: none;
+                }
+                .panel {
+                    max-height: 80vh;
+                }
+            }
+            @media (max-width: 760px) {
+                .layout {
+                    grid-template-columns: 1fr;
+                }
+                .palette {
+                    border-right: 0;
+                    border-bottom: 1px solid var(--line);
+                    max-height: 300px;
+                }
+                .resources {
+                    grid-template-columns: 1fr;
+                }
+                .stage {
+                    padding: 14px;
+                }
+                .board {
+                    padding: 16px;
+                }
+                .actions {
+                    margin-left: 0;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="top">
+            <div class="brand">
+                <svg
+                    width="30"
+                    height="22"
+                    viewBox="0 0 30 22"
+                    aria-hidden="true"
+                >
+                    <rect
+                        x="1"
+                        y="1"
+                        width="28"
+                        height="20"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    />
+                    <path
+                        d="M7 5v12M12 5v12M17 5v12M22 5v12"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    />
+                </svg>
+                <h1>Compose-Editor</h1>
+            </div>
+            <label class="proj"
+                >Projektname
+                <input
+                    id="projName"
+                    type="text"
+                    placeholder="optional"
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+            </label>
+            <div class="actions">
+                <button class="btn" id="btnNew" type="button">Neu</button>
+                <button class="btn" id="btnImport" type="button">
+                    Importieren …
+                </button>
+                <input
+                    type="file"
+                    id="fileImport"
+                    accept=".yml,.yaml,text/yaml"
+                    hidden
+                />
+                <button class="btn" id="btnCopy" type="button">
+                    YAML kopieren
+                </button>
+                <button class="btn primary" id="btnDownload" type="button">
+                    docker-compose.yml herunterladen
+                </button>
+            </div>
+        </header>
+
+        <main class="layout">
+            <aside class="palette" aria-label="Bausteine">
+                <input
+                    id="paletteFilter"
+                    type="text"
+                    placeholder="Bausteine filtern"
+                    aria-label="Bausteine filtern"
+                    autocomplete="off"
+                />
+                <div id="paletteList"></div>
+            </aside>
+
+            <section class="stage" aria-label="Arbeitsfläche">
+                <div class="stage-head">
+                    <h2 id="svcCount">Dienste</h2>
+                    <p class="hint">
+                        Baustein anklicken oder auf die Fläche ziehen.
+                    </p>
+                    <div class="legend" aria-hidden="true">
+                        <span
+                            ><svg width="34" height="8">
+                                <path
+                                    d="M1 4h28"
+                                    stroke="currentColor"
+                                    stroke-width="1.6"
+                                />
+                                <path
+                                    d="M27 1l5 3-5 3z"
+                                    fill="currentColor"
+                                /></svg
+                            >hängt ab von</span
+                        >
+                        <span
+                            ><svg width="34" height="8">
+                                <path
+                                    d="M1 4h28"
+                                    stroke="currentColor"
+                                    stroke-width="1.6"
+                                    stroke-dasharray="4 3"
+                                />
+                                <path
+                                    d="M27 1l5 3-5 3z"
+                                    fill="currentColor"
+                                /></svg
+                            >wartet auf Bedingung</span
+                        >
+                    </div>
+                </div>
+                <div class="board" id="board">
+                    <svg class="links" id="links" aria-hidden="true"></svg>
+                    <div class="tiles" id="tiles"></div>
+                </div>
+
+                <div class="resources" id="resources"></div>
+
+                <section class="issues" aria-live="polite">
+                    <h3>Prüfung</h3>
+                    <div id="issues"></div>
+                </section>
+            </section>
+
+            <aside class="side">
+                <div class="tabs" role="tablist">
+                    <button
+                        class="tab"
+                        role="tab"
+                        id="tabInsp"
+                        aria-selected="true"
+                        aria-controls="inspPanel"
+                        type="button"
+                    >
+                        Eigenschaften
+                    </button>
+                    <button
+                        class="tab"
+                        role="tab"
+                        id="tabYaml"
+                        aria-selected="false"
+                        aria-controls="yamlPanel"
+                        type="button"
+                    >
+                        YAML-Vorschau
+                    </button>
+                </div>
+                <div
+                    class="panel"
+                    id="inspPanel"
+                    role="tabpanel"
+                    aria-labelledby="tabInsp"
+                >
+                    <div id="inspector"></div>
+                </div>
+                <div
+                    class="panel"
+                    id="yamlPanel"
+                    role="tabpanel"
+                    aria-labelledby="tabYaml"
+                    hidden
+                >
+                    <div class="yaml-bar">
+                        <span id="yamlInfo"></span
+                        ><button class="btn small" id="btnCopy2" type="button">
+                            Kopieren
+                        </button>
+                    </div>
+                    <pre class="yaml" id="yamlOut"></pre>
+                </div>
+            </aside>
+        </main>
+
+        <div class="toast" id="toast" role="status" hidden></div>
+
+        <datalist id="volList"></datalist>
+
+        <script>
+            "use strict";
+
+            /* =====================================================================
+                    Vordefinierte Bausteine
+                    ===================================================================== */
+            const HC = (
+                test,
+                interval = "10s",
+                timeout = "5s",
+                retries = "5",
+            ) => ({ test, interval, timeout, retries });
+
+            const CATALOG = [
+                {
+                    cat: "Frontend",
+                    items: [
+                        {
+                            id: "frontend",
+                            label: "Frontend",
+                            svc: {
+                                key: "frontend",
+                                image: "transpectui:latest",
+                                restart: "always",
+                                ports: ["8000:80"],
+                                logging: {
+                                    driver: "json-file",
+                                    options: [
+                                        ["max-size", "10m"],
+                                        ["max-file", "3"]
+                                    ]
+                                },
+                            },
+                        },
+                    ],
+                },
+            ];
+            /*
+                     const CATALOG = [
+                         {
+                             cat: "Webserver & Proxy",
+                             items: [
+                                 {
+                                     id: "nginx",
+                                     label: "Nginx",
+                                     svc: {
+                                         key: "web",
+                                         image: "nginx:stable-alpine",
+                                         restart: "unless-stopped",
+                                         ports: ["8080:80"],
+                                         volumes: [
+                                             "./nginx/conf.d:/etc/nginx/conf.d:ro",
+                                             "./html:/usr/share/nginx/html:ro",
+                                         ],
+                                     },
+                                 },
+                                 {
+                                     id: "caddy",
+                                     label: "Caddy",
+                                     svc: {
+                                         key: "caddy",
+                                         image: "caddy:2-alpine",
+                                         restart: "unless-stopped",
+                                         ports: ["80:80", "443:443"],
+                                         volumes: [
+                                             "./Caddyfile:/etc/caddy/Caddyfile:ro",
+                                             "caddy_data:/data",
+                                             "caddy_config:/config",
+                                         ],
+                                     },
+                                 },
+                                 {
+                                     id: "traefik",
+                                     label: "Traefik",
+                                     svc: {
+                                         key: "traefik",
+                                         image: "traefik:v3",
+                                         restart: "unless-stopped",
+                                         command:
+                                             "--api.insecure=true --providers.docker=true --providers.docker.exposedbydefault=false --entrypoints.web.address=:80",
+                                         ports: ["80:80", "8081:8080"],
+                                         volumes: [
+                                             "/var/run/docker.sock:/var/run/docker.sock:ro",
+                                         ],
+                                     },
+                                 },
+                             ],
+                         },
+                         {
+                             cat: "Datenbanken",
+                             items: [
+                                 {
+                                     id: "postgres",
+                                     label: "PostgreSQL",
+                                     svc: {
+                                         key: "postgres",
+                                         image: "postgres:16-alpine",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             POSTGRES_USER: "app",
+                                             POSTGRES_PASSWORD: "change-me",
+                                             POSTGRES_DB: "app",
+                                         },
+                                         ports: ["5432:5432"],
+                                         volumes: ["pgdata:/var/lib/postgresql/data"],
+                                         hc: HC("pg_isready -U app -d app"),
+                                     },
+                                 },
+                                 {
+                                     id: "mariadb",
+                                     label: "MariaDB",
+                                     svc: {
+                                         key: "mariadb",
+                                         image: "mariadb:11",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             MARIADB_ROOT_PASSWORD: "change-me",
+                                             MARIADB_DATABASE: "app",
+                                             MARIADB_USER: "app",
+                                             MARIADB_PASSWORD: "change-me",
+                                         },
+                                         ports: ["3306:3306"],
+                                         volumes: ["mariadb_data:/var/lib/mysql"],
+                                         hc: HC(
+                                             "healthcheck.sh --connect --innodb_initialized",
+                                         ),
+                                     },
+                                 },
+                                 {
+                                     id: "mysql",
+                                     label: "MySQL",
+                                     svc: {
+                                         key: "mysql",
+                                         image: "mysql:8.4",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             MYSQL_ROOT_PASSWORD: "change-me",
+                                             MYSQL_DATABASE: "app",
+                                             MYSQL_USER: "app",
+                                             MYSQL_PASSWORD: "change-me",
+                                         },
+                                         ports: ["3306:3306"],
+                                         volumes: ["mysql_data:/var/lib/mysql"],
+                                         hc: HC("mysqladmin ping -h localhost"),
+                                     },
+                                 },
+                                 {
+                                     id: "mongo",
+                                     label: "MongoDB",
+                                     svc: {
+                                         key: "mongo",
+                                         image: "mongo:7",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             MONGO_INITDB_ROOT_USERNAME: "root",
+                                             MONGO_INITDB_ROOT_PASSWORD: "change-me",
+                                         },
+                                         ports: ["27017:27017"],
+                                         volumes: ["mongo_data:/data/db"],
+                                     },
+                                 },
+                             ],
+                         },
+                         {
+                             cat: "Cache, Queue & Storage",
+                             items: [
+                                 {
+                                     id: "redis",
+                                     label: "Redis",
+                                     svc: {
+                                         key: "redis",
+                                         image: "redis:7-alpine",
+                                         restart: "unless-stopped",
+                                         command: "redis-server --appendonly yes",
+                                         volumes: ["redis_data:/data"],
+                                         hc: HC("redis-cli ping"),
+                                     },
+                                 },
+                                 {
+                                     id: "rabbitmq",
+                                     label: "RabbitMQ",
+                                     svc: {
+                                         key: "rabbitmq",
+                                         image: "rabbitmq:3-management",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             RABBITMQ_DEFAULT_USER: "app",
+                                             RABBITMQ_DEFAULT_PASS: "change-me",
+                                         },
+                                         ports: ["5672:5672", "15672:15672"],
+                                         volumes: ["rabbitmq_data:/var/lib/rabbitmq"],
+                                     },
+                                 },
+                                 {
+                                     id: "minio",
+                                     label: "MinIO",
+                                     svc: {
+                                         key: "minio",
+                                         image: "minio/minio",
+                                         restart: "unless-stopped",
+                                         command:
+                                             'server /data --console-address ":9001"',
+                                         environment: {
+                                             MINIO_ROOT_USER: "admin",
+                                             MINIO_ROOT_PASSWORD: "change-me",
+                                         },
+                                         ports: ["9000:9000", "9001:9001"],
+                                         volumes: ["minio_data:/data"],
+                                     },
+                                 },
+                             ],
+                         },
+                         {
+                             cat: "Anwendungen & Laufzeit",
+                             items: [
+                                 {
+                                     id: "build",
+                                     label: "Eigenes Image (build)",
+                                     svc: {
+                                         key: "app",
+                                         build: ".",
+                                         restart: "unless-stopped",
+                                         ports: ["8000:8000"],
+                                     },
+                                 },
+                                 {
+                                     id: "node",
+                                     label: "Node.js",
+                                     svc: {
+                                         key: "node",
+                                         image: "node:20-alpine",
+                                         working_dir: "/app",
+                                         command: "npm start",
+                                         environment: { NODE_ENV: "development" },
+                                         ports: ["3000:3000"],
+                                         volumes: [".:/app"],
+                                     },
+                                 },
+                                 {
+                                     id: "python",
+                                     label: "Python",
+                                     svc: {
+                                         key: "python",
+                                         image: "python:3.12-slim",
+                                         working_dir: "/app",
+                                         command: "python app.py",
+                                         ports: ["8000:8000"],
+                                         volumes: [".:/app"],
+                                     },
+                                 },
+                                 {
+                                     id: "wordpress",
+                                     label: "WordPress",
+                                     svc: {
+                                         key: "wordpress",
+                                         image: "wordpress:6-apache",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             WORDPRESS_DB_HOST: "mariadb",
+                                             WORDPRESS_DB_USER: "app",
+                                             WORDPRESS_DB_PASSWORD: "change-me",
+                                             WORDPRESS_DB_NAME: "app",
+                                         },
+                                         ports: ["8082:80"],
+                                         volumes: ["wp_data:/var/www/html"],
+                                     },
+                                 },
+                             ],
+                         },
+                         {
+                             cat: "Verwaltung & Werkzeuge",
+                             items: [
+                                 {
+                                     id: "adminer",
+                                     label: "Adminer",
+                                     svc: {
+                                         key: "adminer",
+                                         image: "adminer",
+                                         restart: "unless-stopped",
+                                         ports: ["8083:8080"],
+                                     },
+                                 },
+                                 {
+                                     id: "phpmyadmin",
+                                     label: "phpMyAdmin",
+                                     svc: {
+                                         key: "phpmyadmin",
+                                         image: "phpmyadmin",
+                                         restart: "unless-stopped",
+                                         environment: { PMA_HOST: "mariadb" },
+                                         ports: ["8084:80"],
+                                     },
+                                 },
+                                 {
+                                     id: "mailpit",
+                                     label: "Mailpit",
+                                     svc: {
+                                         key: "mailpit",
+                                         image: "axllent/mailpit",
+                                         restart: "unless-stopped",
+                                         ports: ["8025:8025", "1025:1025"],
+                                     },
+                                 },
+                             ],
+                         },
+                         {
+                             cat: "KI",
+                             items: [
+                                 {
+                                     id: "ollama",
+                                     label: "Ollama",
+                                     svc: {
+                                         key: "ollama",
+                                         image: "ollama/ollama",
+                                         restart: "unless-stopped",
+                                         ports: ["11434:11434"],
+                                         volumes: ["ollama_data:/root/.ollama"],
+                                     },
+                                 },
+                                 {
+                                     id: "openwebui",
+                                     label: "Open WebUI",
+                                     svc: {
+                                         key: "open-webui",
+                                         image: "ghcr.io/open-webui/open-webui:main",
+                                         restart: "unless-stopped",
+                                         environment: {
+                                             OLLAMA_BASE_URL: "http://ollama:11434",
+                                         },
+                                         ports: ["3001:8080"],
+                                         volumes: ["open_webui_data:/app/backend/data"],
+                                     },
+                                 },
+                             ],
+                         },
+                         {
+                             cat: "Leer",
+                             items: [
+                                 {
+                                     id: "blank",
+                                     label: "Leerer Dienst",
+                                     svc: { key: "service" },
+                                 },
+                             ],
+                         },
+                     ];
+                     */
+            const TEMPLATE_BY_ID = Object.fromEntries(
+                CATALOG.flatMap((c) => c.items).map((t) => [t.id, t]),
+            );
+
+            const RESTART_OPTS = [
+                "",
+                "no",
+                "always",
+                "on-failure",
+                "unless-stopped",
+            ];
+            const COND_OPTS = [
+                ["service_started", "gestartet"],
+                ["service_healthy", "healthy"],
+                ["service_completed_successfully", "erfolgreich beendet"],
+            ];
+            const STORAGE_KEY = "compose-editor-state-v1";
+            const KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
+            const PROJECT_RE = /^[a-z0-9][a-z0-9_-]*$/;
+
+            /* =====================================================================
+            Zustand
+            ===================================================================== */
+            const uid = (p = "s") =>
+                p + Math.random().toString(36).slice(2, 10);
+            const emptyState = () => ({
+                name: "",
+                services: [],
+                volumes: [],
+                networks: [],
+                extra: "",
+            });
+            let state = emptyState();
+            let selectedId = null;
+            let lastAddedId = null;
+
+            function newService(base = {}) {
+                const env =
+                    base.environment && !Array.isArray(base.environment)
+                        ? Object.entries(base.environment).map(([k, v]) => [
+                              k,
+                              String(v),
+                          ])
+                        : base.environment || [];
+                return {
+                    id: uid("s"),
+                    key: "",
+                    image: "",
+                    build: "",
+                    container_name: "",
+                    restart: "",
+                    working_dir: "",
+                    command: "",
+                    ports: [],
+                    volumes: [],
+                    networks: [],
+                    depends_on: [],
+                    extra: "",
+                    ...base,
+                    environment: env,
+                    hc: {
+                        test: "",
+                        interval: "",
+                        timeout: "",
+                        retries: "",
+                        ...(base.hc || {}),
+                    },
+                };
+            }
+
+            const svcById = (id) => state.services.find((s) => s.id === id);
+            const netById = (id) => state.networks.find((n) => n.id === id);
+
+            function save() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                } catch (e) {
+                    /* Speicher nicht verfügbar */
+                }
+            }
+            function load() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return;
+                    const parsed = JSON.parse(raw);
+                    if (parsed && Array.isArray(parsed.services)) {
+                        state = { ...emptyState(), ...parsed };
+                        state.services = state.services.map((s) =>
+                            newService(s),
+                        );
+                    }
+                } catch (e) {
+                    state = emptyState();
+                }
+            }
+
+            /* =====================================================================
+            Hilfsfunktionen
+            ===================================================================== */
+            const $ = (sel) => document.querySelector(sel);
+
+            function h(tag, props, ...kids) {
+                const el = document.createElement(tag);
+                let pendingValue;
+                for (const [k, v] of Object.entries(props || {})) {
+                    if (v == null || v === false) continue;
+                    if (k === "class") el.className = v;
+                    else if (k === "value") pendingValue = v;
+                    else if (k === "checked") el.checked = !!v;
+                    else if (k.startsWith("on") && typeof v === "function")
+                        el.addEventListener(k.slice(2), v);
+                    else el.setAttribute(k, v === true ? "" : v);
+                }
+                for (const kid of kids.flat(Infinity)) {
+                    if (kid == null || kid === false) continue;
+                    el.append(
+                        kid.nodeType
+                            ? kid
+                            : document.createTextNode(String(kid)),
+                    );
+                }
+                if (pendingValue !== undefined) el.value = pendingValue;
+                return el;
+            }
+
+            function escapeHtml(s) {
+                return String(s).replace(
+                    /[&<>"']/g,
+                    (c) =>
+                        ({
+                            "&": "&amp;",
+                            "<": "&lt;",
+                            ">": "&gt;",
+                            '"': "&quot;",
+                            "'": "&#39;",
+                        })[c],
+                );
+            }
+
+            let toastTimer;
+            function toast(msg, ms = 2400) {
+                const t = $("#toast");
+                t.textContent = msg;
+                t.hidden = false;
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => {
+                    t.hidden = true;
+                }, ms);
+            }
+
+            function isNamedVolumeSource(mount) {
+                if (!mount.includes(":")) return false;
+                const src = mount.split(":")[0];
+                return (
+                    !!src &&
+                    !/^[\/.~$]/.test(src) &&
+                    !src.includes("/") &&
+                    !/^[A-Za-z]$/.test(src)
+                );
+            }
+            const volumeSource = (mount) => mount.split(":")[0];
+
+            function parseHostPort(p) {
+                const s = String(p).trim();
+                if (!s || s.includes("$")) return null;
+                const [main, proto = "tcp"] = s.split("/");
+                const parts = main.split(":");
+                if (parts.length === 1) return null;
+                const host =
+                    parts.length >= 3 ? parts[parts.length - 2] : parts[0];
+                const ip =
+                    parts.length >= 3
+                        ? parts.slice(0, parts.length - 2).join(":")
+                        : "0.0.0.0";
+                if (!host) return null;
+                return { key: `${ip}|${host}|${proto}`, host, ip, proto };
+            }
+
+            /* =====================================================================
+            YAML-Ausgabe
+            ===================================================================== */
+            function yq(value) {
+                const s = String(value);
+                if (s === "") return '""';
+                const needsQuotes =
+                    /^[\s\-?:,\[\]{}#&*!|>'"%@`]/.test(s) ||
+                    /\s$/.test(s) ||
+                    /:(\s|$)/.test(s) ||
+                    /\s#/.test(s) ||
+                    /[\n\t"\\]/.test(s) ||
+                    /^(true|false|yes|no|on|off|y|n|null|~)$/i.test(s) ||
+                    /^[-+]?(\d[\d_]*(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/.test(s) ||
+                    /^0[xob]/i.test(s) ||
+                    /^\d+(:\d+)+$/.test(s);
+                if (!needsQuotes) return s;
+                return (
+                    '"' +
+                    s
+                        .replace(/\\/g, "\\\\")
+                        .replace(/"/g, '\\"')
+                        .replace(/\n/g, "\\n")
+                        .replace(/\t/g, "\\t") +
+                    '"'
+                );
+            }
+            const dq = (s) =>
+                '"' +
+                String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') +
+                '"';
+
+            function rawBlock(text, indent) {
+                return text
+                    .replace(/\s+$/, "")
+                    .split("\n")
+                    .filter((l, i, a) => !(i === 0 && l.trim() === ""))
+                    .map((l) =>
+                        l.trim() ? indent + l.replace(/\s+$/, "") : "",
+                    );
+            }
+
+            function toYaml() {
+                const L = [];
+                if (state.name.trim())
+                    L.push("name: " + yq(state.name.trim()), "");
+                if (!state.services.length) {
+                    L.push("services: {}");
+                } else {
+                    L.push("services:");
+                    state.services.forEach((s, idx) => {
+                        const p = "    ";
+                        L.push(
+                            `  ${yq(s.key.trim() || "unbenannt-" + (idx + 1))}:`,
+                        );
+                        if (s.image.trim())
+                            L.push(`${p}image: ${yq(s.image.trim())}`);
+                        if (s.build.trim())
+                            L.push(`${p}build: ${yq(s.build.trim())}`);
+                        if (s.container_name.trim())
+                            L.push(
+                                `${p}container_name: ${yq(s.container_name.trim())}`,
+                            );
+                        if (s.restart) L.push(`${p}restart: ${yq(s.restart)}`);
+                        if (s.working_dir.trim())
+                            L.push(
+                                `${p}working_dir: ${yq(s.working_dir.trim())}`,
+                            );
+                        if (s.command.trim())
+                            L.push(`${p}command: ${yq(s.command.trim())}`);
+
+                        const ports = s.ports
+                            .map((x) => x.trim())
+                            .filter(Boolean);
+                        if (ports.length) {
+                            L.push(`${p}ports:`);
+                            ports.forEach((x) => L.push(`${p}  - ${dq(x)}`));
+                        }
+
+                        const lg = s.logging || {};
+                        const lgDriver = String(lg.driver || "").trim();
+                        const lgOpts = (lg.options || []).filter(([k]) =>
+                            String(k).trim(),
+                        );
+                        if (lgDriver || lgOpts.length) {
+                            L.push(`${p}logging:`);
+                            if (lgDriver)
+                                L.push(`${p}  driver: ${yq(lgDriver)}`);
+                            if (lgOpts.length) {
+                                L.push(`${p}  options:`);
+                                // Option values MUST be strings; yq() quotes numeric values such as "3" automatically.
+                                lgOpts.forEach(([k, v]) =>
+                                    L.push(
+                                        `${p}    ${yq(String(k).trim())}: ${yq(v == null ? "" : String(v))}`,
+                                    ),
+                                );
+                            }
+                        }
+
+                        const env = s.environment.filter(([k]) => k.trim());
+                        if (env.length) {
+                            L.push(`${p}environment:`);
+                            env.forEach(([k, v]) =>
+                                L.push(`${p}  ${yq(k.trim())}: ${yq(v)}`),
+                            );
+                        }
+
+                        const vols = s.volumes
+                            .map((x) => x.trim())
+                            .filter(Boolean);
+                        if (vols.length) {
+                            L.push(`${p}volumes:`);
+                            vols.forEach((x) => L.push(`${p}  - ${yq(x)}`));
+                        }
+
+                        const nets = s.networks
+                            .map((id) => netById(id))
+                            .filter((n) => n && n.name.trim());
+                        if (nets.length) {
+                            L.push(`${p}networks:`);
+                            nets.forEach((n) =>
+                                L.push(`${p}  - ${yq(n.name.trim())}`),
+                            );
+                        }
+
+                        const deps = s.depends_on
+                            .map((d) => ({ ...d, svc: svcById(d.id) }))
+                            .filter((d) => d.svc && d.svc.key.trim());
+                        if (deps.length) {
+                            L.push(`${p}depends_on:`);
+                            if (
+                                deps.every(
+                                    (d) => d.condition === "service_started",
+                                )
+                            ) {
+                                deps.forEach((d) =>
+                                    L.push(`${p}  - ${yq(d.svc.key.trim())}`),
+                                );
+                            } else {
+                                deps.forEach((d) => {
+                                    L.push(`${p}  ${yq(d.svc.key.trim())}:`);
+                                    L.push(`${p}    condition: ${d.condition}`);
+                                });
+                            }
+                        }
+
+                        const hc = s.hc;
+                        if (hc.test.trim()) {
+                            const t = hc.test.trim();
+                            L.push(`${p}healthcheck:`);
+                            L.push(
+                                `${p}  test: ${t.startsWith("[") ? t : yq(t)}`,
+                            );
+                            if (hc.interval.trim())
+                                L.push(
+                                    `${p}  interval: ${yq(hc.interval.trim())}`,
+                                );
+                            if (hc.timeout.trim())
+                                L.push(
+                                    `${p}  timeout: ${yq(hc.timeout.trim())}`,
+                                );
+                            if (String(hc.retries).trim())
+                                L.push(
+                                    `${p}  retries: ${/^\d+$/.test(String(hc.retries).trim()) ? String(hc.retries).trim() : yq(hc.retries)}`,
+                                );
+                        }
+
+                        if (s.extra.trim()) L.push(...rawBlock(s.extra, p));
+                        L.push("");
+                    });
+                }
+
+                const resBlock = (title, list) => {
+                    const items = list.filter((r) => r.name.trim());
+                    if (!items.length) return;
+                    if (L[L.length - 1] !== "") L.push("");
+                    L.push(`${title}:`);
+                    items.forEach((r) => {
+                        const opts = [];
+                        if (r.raw && r.raw.trim())
+                            opts.push(...rawBlock(r.raw, "    "));
+                        else if (r.external) opts.push("    external: true");
+                        else if (r.driver.trim())
+                            opts.push(`    driver: ${yq(r.driver.trim())}`);
+                        L.push(`  ${yq(r.name.trim())}:`);
+                        L.push(...opts);
+                    });
+                };
+                resBlock("volumes", state.volumes);
+                resBlock("networks", state.networks);
+
+                if (state.extra.trim()) {
+                    if (L[L.length - 1] !== "") L.push("");
+                    L.push(...rawBlock(state.extra, ""));
+                }
+                while (L.length && L[L.length - 1] === "") L.pop();
+                return L.join("\n") + "\n";
+            }
+
+            function highlightYaml(yaml) {
+                const val = (v) => {
+                    if (v === "") return "";
+                    if (/^["']/.test(v))
+                        return `<span class="y-str">${escapeHtml(v)}</span>`;
+                    if (/^(true|false|null|~|-?\d+(\.\d+)?)$/.test(v))
+                        return `<span class="y-num">${escapeHtml(v)}</span>`;
+                    if (/^\[/.test(v))
+                        return `<span class="y-str">${escapeHtml(v)}</span>`;
+                    return escapeHtml(v);
+                };
+                return yaml
+                    .split("\n")
+                    .map((line) => {
+                        if (/^\s*#/.test(line))
+                            return `<span class="y-com">${escapeHtml(line)}</span>`;
+                        const m = line.match(
+                            /^(\s*)(- )?([^\s:"'#][^:]*?|"(?:[^"\\]|\\.)*")(:)(\s+|$)(.*)$/,
+                        );
+                        if (m)
+                            return `${m[1]}${m[2] ? '<span class="y-dash">- </span>' : ""}<span class="y-key">${escapeHtml(m[3])}</span>:${m[5]}${val(m[6])}`;
+                        const d = line.match(/^(\s*)- (.*)$/);
+                        if (d)
+                            return `${d[1]}<span class="y-dash">- </span>${val(d[2])}`;
+                        return escapeHtml(line);
+                    })
+                    .join("\n");
+            }
+
+            /* =====================================================================
+            Prüfung
+            ===================================================================== */
+            function validate() {
+                const issues = [];
+                const add = (level, msg, svcId = null) =>
+                    issues.push({ level, msg, svcId });
+
+                if (state.name.trim() && !PROJECT_RE.test(state.name.trim()))
+                    add(
+                        "error",
+                        "Projektname: nur Kleinbuchstaben, Ziffern, „-“ und „_“; muss mit Buchstabe oder Ziffer beginnen.",
+                    );
+
+                const keyCount = {};
+                state.services.forEach((s) => {
+                    const k = s.key.trim();
+                    if (k) keyCount[k] = (keyCount[k] || 0) + 1;
+                });
+
+                const portUse = {};
+                const declaredVols = new Set(
+                    state.volumes.map((v) => v.name.trim()).filter(Boolean),
+                );
+
+                state.services.forEach((s) => {
+                    const k = s.key.trim();
+                    const label = k || "(ohne Namen)";
+                    if (!k) add("error", "Ein Dienst hat keinen Namen.", s.id);
+                    else if (!KEY_RE.test(k))
+                        add(
+                            "error",
+                            `${label}: Name enthält unzulässige Zeichen (erlaubt: a–z, A–Z, 0–9, „_“, „.“, „-“).`,
+                            s.id,
+                        );
+                    if (k && keyCount[k] > 1)
+                        add(
+                            "error",
+                            `${label}: Name ist mehrfach vergeben.`,
+                            s.id,
+                        );
+                    if (!s.image.trim() && !s.build.trim())
+                        add(
+                            "error",
+                            `${label}: Weder Image noch Build-Kontext angegeben.`,
+                            s.id,
+                        );
+
+                    s.ports.forEach((p) => {
+                        const hp = parseHostPort(p);
+                        if (hp)
+                            (portUse[hp.key] = portUse[hp.key] || []).push({
+                                s,
+                                hp,
+                            });
+                        if (
+                            p.trim() &&
+                            !/^[\d.:\[\]a-fA-F${}\-_/A-Za-z]+$/.test(p.trim())
+                        )
+                            add(
+                                "warn",
+                                `${label}: Portangabe „${p}“ prüfen.`,
+                                s.id,
+                            );
+                    });
+
+                    s.volumes.forEach((v) => {
+                        const t = v.trim();
+                        if (
+                            t &&
+                            isNamedVolumeSource(t) &&
+                            !declaredVols.has(volumeSource(t))
+                        )
+                            add(
+                                "error",
+                                `${label}: Volume „${volumeSource(t)}“ ist nicht unter „volumes“ deklariert.`,
+                                s.id,
+                            );
+                    });
+
+                    s.depends_on.forEach((d) => {
+                        const target = svcById(d.id);
+                        if (!target) return;
+                        if (
+                            d.condition === "service_healthy" &&
+                            !target.hc.test.trim() &&
+                            !/healthcheck\s*:/.test(target.extra)
+                        )
+                            add(
+                                "warn",
+                                `${label}: wartet auf „healthy“ von ${target.key || "(ohne Namen)"}, dort ist aber kein Healthcheck definiert.`,
+                                s.id,
+                            );
+                    });
+
+                    const emitted = new Set();
+                    [
+                        "image",
+                        "build",
+                        "container_name",
+                        "restart",
+                        "working_dir",
+                        "command",
+                    ].forEach((f) => {
+                        if (String(s[f]).trim()) emitted.add(f);
+                    });
+                    if (s.ports.some((x) => x.trim())) emitted.add("ports");
+                    if (s.environment.some(([kk]) => kk.trim()))
+                        emitted.add("environment");
+                    if (s.volumes.some((x) => x.trim())) emitted.add("volumes");
+                    if (s.networks.length) emitted.add("networks");
+                    if (s.depends_on.length) emitted.add("depends_on");
+                    if (s.hc.test.trim()) emitted.add("healthcheck");
+                    const extraKeys =
+                        s.extra.match(/^[A-Za-z_][\w.-]*(?=\s*:)/gm) || [];
+                    extraKeys
+                        .filter((x) => emitted.has(x))
+                        .forEach((x) =>
+                            add(
+                                "error",
+                                `${label}: „${x}“ ist sowohl im Formular als auch unter „Weitere Einträge“ gesetzt (doppelter Schlüssel).`,
+                                s.id,
+                            ),
+                        );
+
+                    if (s.environment.some(([, v]) => /change-me/.test(v)))
+                        add(
+                            "warn",
+                            `${label}: Platzhalter-Passwort „change-me“ ersetzen, idealerweise über eine .env-Datei (\${VARIABLE}).`,
+                            s.id,
+                        );
+                });
+
+                Object.values(portUse).forEach((list) => {
+                    if (list.length > 1) {
+                        const names = [
+                            ...new Set(
+                                list.map((x) => x.s.key || "(ohne Namen)"),
+                            ),
+                        ].join(", ");
+                        add(
+                            "error",
+                            `Host-Port ${list[0].hp.host}/${list[0].hp.proto} mehrfach belegt: ${names}.`,
+                            list[0].s.id,
+                        );
+                    }
+                });
+
+                // Zyklen in depends_on
+                const color = {};
+                const visit = (s, stack) => {
+                    color[s.id] = 1;
+                    stack.push(s);
+                    for (const d of s.depends_on) {
+                        const t = svcById(d.id);
+                        if (!t) continue;
+                        if (color[t.id] === 1) {
+                            const cyc = stack
+                                .slice(stack.indexOf(t))
+                                .map((x) => x.key || "?")
+                                .concat(t.key || "?");
+                            add(
+                                "error",
+                                `Zirkuläre Abhängigkeit: ${cyc.join(" → ")}.`,
+                                s.id,
+                            );
+                        } else if (!color[t.id]) visit(t, stack);
+                    }
+                    stack.pop();
+                    color[s.id] = 2;
+                };
+                state.services.forEach((s) => {
+                    if (!color[s.id]) visit(s, []);
+                });
+
+                const resCheck = (list, what) => {
+                    const seen = {};
+                    list.forEach((r) => {
+                        const n = r.name.trim();
+                        if (!n) {
+                            add(
+                                "error",
+                                `Ein Eintrag unter „${what}“ hat keinen Namen.`,
+                            );
+                            return;
+                        }
+                        if (!KEY_RE.test(n))
+                            add(
+                                "error",
+                                `${what}: „${n}“ enthält unzulässige Zeichen.`,
+                            );
+                        if (seen[n])
+                            add(
+                                "error",
+                                `${what}: „${n}“ ist doppelt deklariert.`,
+                            );
+                        seen[n] = true;
+                    });
+                };
+                resCheck(state.volumes, "volumes");
+                resCheck(state.networks, "networks");
+                return issues;
+            }
+
+            /* =====================================================================
+            Aktionen
+            ===================================================================== */
+            function addFromTemplate(tplId) {
+                const tpl = TEMPLATE_BY_ID[tplId];
+                if (!tpl) return;
+                const base = structuredClone(tpl.svc);
+                const keys = new Set(state.services.map((s) => s.key.trim()));
+                let suffix = "";
+                if (keys.has(base.key)) {
+                    let n = 2;
+                    while (keys.has(`${base.key}-${n}`)) n++;
+                    suffix = `-${n}`;
+                }
+                base.key += suffix;
+
+                // Benannte Volumes eindeutig machen und deklarieren
+                base.volumes = (base.volumes || []).map((v) => {
+                    if (!isNamedVolumeSource(v)) return v;
+                    const src = volumeSource(v);
+                    const name = src + (suffix ? suffix.replace("-", "_") : "");
+                    if (!state.volumes.some((x) => x.name === name))
+                        state.volumes.push({
+                            id: uid("v"),
+                            name,
+                            driver: "",
+                            external: false,
+                        });
+                    return name + v.slice(src.length);
+                });
+
+                // Host-Ports bei Kollision hochzählen
+                const used = new Set();
+                state.services.forEach((s) =>
+                    s.ports.forEach((p) => {
+                        const hp = parseHostPort(p);
+                        if (hp) used.add(hp.key);
+                    }),
+                );
+                base.ports = (base.ports || []).map((p) => {
+                    const m = /^(\d+):(\d+)(\/\w+)?$/.exec(p);
+                    if (!m) return p;
+                    let host = +m[1];
+                    const proto = (m[3] || "/tcp").slice(1);
+                    while (used.has(`0.0.0.0|${host}|${proto}`)) host++;
+                    used.add(`0.0.0.0|${host}|${proto}`);
+                    return `${host}:${m[2]}${m[3] || ""}`;
+                });
+
+                // Neue Dienste in vorhandene Netzwerke einhängen, falls genau eines existiert
+                if (state.networks.length === 1)
+                    base.networks = [state.networks[0].id];
+
+                const svc = newService(base);
+                state.services.push(svc);
+                selectedId = svc.id;
+                lastAddedId = svc.id;
+                showTab("insp");
+                renderAll();
+                toast(`${tpl.label} als „${svc.key}“ hinzugefügt.`);
+            }
+
+            function removeService(id) {
+                const s = svcById(id);
+                if (!s) return;
+                state.services = state.services.filter((x) => x.id !== id);
+                state.services.forEach((x) => {
+                    x.depends_on = x.depends_on.filter((d) => d.id !== id);
+                });
+                if (selectedId === id) selectedId = null;
+                renderAll();
+                toast(`Dienst „${s.key || "(ohne Namen)"}“ entfernt.`);
+            }
+
+            function duplicateService(id) {
+                const s = svcById(id);
+                if (!s) return;
+                const copy = structuredClone(s);
+                copy.id = uid("s");
+                const keys = new Set(state.services.map((x) => x.key.trim()));
+                let n = 2;
+                while (keys.has(`${s.key}-${n}`)) n++;
+                copy.key = `${s.key}-${n}`;
+                copy.container_name = "";
+                copy.ports = [];
+                state.services.splice(state.services.indexOf(s) + 1, 0, copy);
+                selectedId = copy.id;
+                lastAddedId = copy.id;
+                renderAll();
+                toast(
+                    "Dienst dupliziert. Host-Ports und container_name wurden geleert.",
+                );
+            }
+
+            function moveService(id, dir) {
+                const i = state.services.findIndex((s) => s.id === id);
+                const j = i + dir;
+                if (i < 0 || j < 0 || j >= state.services.length) return;
+                [state.services[i], state.services[j]] = [
+                    state.services[j],
+                    state.services[i],
+                ];
+                renderAll();
+            }
+
+            function renameVolume(oldName, newName) {
+                if (!oldName || oldName === newName) return;
+                state.services.forEach((s) => {
+                    s.volumes = s.volumes.map((v) =>
+                        isNamedVolumeSource(v) && volumeSource(v) === oldName
+                            ? newName + v.slice(oldName.length)
+                            : v,
+                    );
+                });
+            }
+
+            /* =====================================================================
+            Darstellung: Palette
+            ===================================================================== */
+            function renderPalette() {
+                const q = $("#paletteFilter").value.trim().toLowerCase();
+                const box = $("#paletteList");
+                box.replaceChildren();
+                CATALOG.forEach((cat) => {
+                    const items = cat.items.filter(
+                        (t) =>
+                            !q ||
+                            (
+                                t.label +
+                                " " +
+                                (t.svc.image || "") +
+                                " " +
+                                cat.cat
+                            )
+                                .toLowerCase()
+                                .includes(q),
+                    );
+                    if (!items.length) return;
+                    box.append(h("h2", {}, cat.cat));
+                    items.forEach((t) => {
+                        box.append(
+                            h(
+                                "button",
+                                {
+                                    class: "brick",
+                                    type: "button",
+                                    draggable: "true",
+                                    title: `${t.label} hinzufügen`,
+                                    onclick: () => addFromTemplate(t.id),
+                                    ondragstart: (e) => {
+                                        e.dataTransfer.setData(
+                                            "text/x-compose-template",
+                                            t.id,
+                                        );
+                                        e.dataTransfer.setData(
+                                            "text/plain",
+                                            t.id,
+                                        );
+                                        e.dataTransfer.effectAllowed = "copy";
+                                    },
+                                },
+                                h("b", {}, t.label),
+                                h(
+                                    "span",
+                                    {},
+                                    t.svc.image ||
+                                        (t.svc.build
+                                            ? `build: ${t.svc.build}`
+                                            : "eigene Konfiguration"),
+                                ),
+                            ),
+                        );
+                    });
+                });
+                if (!box.children.length)
+                    box.append(
+                        h(
+                            "p",
+                            { class: "hint" },
+                            "Kein Baustein passt zum Filter.",
+                        ),
+                    );
+            }
+
+            /* =====================================================================
+            Darstellung: Arbeitsfläche
+            ===================================================================== */
+            let issuesCache = [];
+
+            function renderTiles() {
+                const box = $("#tiles");
+                box.replaceChildren();
+                const n = state.services.length;
+                $("#svcCount").textContent =
+                    n === 1 ? "1 Dienst" : `${n} Dienste`;
+
+                if (!n) {
+                    box.style.display = "block";
+                    box.append(
+                        h(
+                            "div",
+                            { class: "board-empty" },
+                            h("strong", {}, "Noch keine Dienste"),
+                            "Links einen Baustein anklicken oder hierher ziehen. Abhängigkeiten erscheinen anschließend als Pfeile.",
+                        ),
+                    );
+                    drawLinks();
+                    return;
+                }
+                box.style.display = "";
+
+                state.services.forEach((s) => {
+                    const own = issuesCache.filter((i) => i.svcId === s.id);
+                    const errs = own.filter((i) => i.level === "error").length;
+                    const warns = own.length - errs;
+                    const ports = s.ports.map((p) => p.trim()).filter(Boolean);
+                    const nVol = s.volumes.filter((v) => v.trim()).length;
+                    const nEnv = s.environment.filter(([k]) => k.trim()).length;
+
+                    const tile = h(
+                        "button",
+                        {
+                            class:
+                                "tile" +
+                                (s.id === selectedId ? " selected" : "") +
+                                (s.id === lastAddedId ? " landed" : ""),
+                            type: "button",
+                            "data-id": s.id,
+                            "aria-pressed":
+                                s.id === selectedId ? "true" : "false",
+                            onclick: () => {
+                                selectedId = s.id;
+                                showTab("insp");
+                                renderTiles();
+                                renderInspector();
+                            },
+                        },
+                        h("span", {
+                            class: "tile-ribs",
+                            "aria-hidden": "true",
+                        }),
+                        h(
+                            "span",
+                            { class: "tile-body" },
+                            h(
+                                "span",
+                                { class: "tile-name" },
+                                s.key || "(ohne Namen)",
+                            ),
+                            h(
+                                "span",
+                                { class: "tile-img" },
+                                s.image ||
+                                    (s.build
+                                        ? `build: ${s.build}`
+                                        : "kein Image"),
+                            ),
+                            h(
+                                "span",
+                                { class: "tile-meta" },
+                                ports
+                                    .slice(0, 3)
+                                    .map((p) =>
+                                        h("span", { class: "chip port" }, p),
+                                    ),
+                                ports.length > 3
+                                    ? h(
+                                          "span",
+                                          { class: "chip" },
+                                          `+${ports.length - 3}`,
+                                      )
+                                    : null,
+                                nVol
+                                    ? h(
+                                          "span",
+                                          { class: "chip" },
+                                          `${nVol} Vol.`,
+                                      )
+                                    : null,
+                                nEnv
+                                    ? h(
+                                          "span",
+                                          { class: "chip" },
+                                          `${nEnv} Env`,
+                                      )
+                                    : null,
+                                s.hc.test.trim()
+                                    ? h(
+                                          "span",
+                                          { class: "chip" },
+                                          "Healthcheck",
+                                      )
+                                    : null,
+                            ),
+                        ),
+                        errs
+                            ? h(
+                                  "span",
+                                  { class: "tile-flag" },
+                                  errs === 1 ? "1 Fehler" : `${errs} Fehler`,
+                              )
+                            : warns
+                              ? h(
+                                    "span",
+                                    { class: "tile-flag warn" },
+                                    warns === 1
+                                        ? "1 Hinweis"
+                                        : `${warns} Hinweise`,
+                                )
+                              : null,
+                    );
+                    box.append(tile);
+                });
+                lastAddedId = null;
+                requestAnimationFrame(drawLinks);
+            }
+
+            function drawLinks() {
+                const svg = $("#links");
+                const board = $("#board");
+                svg.replaceChildren();
+                const br = board.getBoundingClientRect();
+                const NS = "http://www.w3.org/2000/svg";
+                const mk = (tag, attrs) => {
+                    const el = document.createElementNS(NS, tag);
+                    for (const [k, v] of Object.entries(attrs))
+                        el.setAttribute(k, v);
+                    return el;
+                };
+
+                const defs = mk("defs", {});
+                const marker = mk("marker", {
+                    id: "arrow",
+                    viewBox: "0 0 10 10",
+                    refX: "9",
+                    refY: "5",
+                    markerWidth: "7",
+                    markerHeight: "7",
+                    orient: "auto-start-reverse",
+                });
+                marker.append(
+                    mk("path", { d: "M0 0L10 5L0 10z", fill: "var(--steel)" }),
+                );
+                defs.append(marker);
+                svg.append(defs);
+
+                const rects = {};
+                board.querySelectorAll(".tile").forEach((el) => {
+                    const r = el.getBoundingClientRect();
+                    rects[el.dataset.id] = {
+                        x: r.left - br.left,
+                        y: r.top - br.top,
+                        w: r.width,
+                        h: r.height,
+                    };
+                });
+                const center = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+                const edge = (r, toward, gap) => {
+                    const c = center(r);
+                    const dx = toward.x - c.x,
+                        dy = toward.y - c.y;
+                    if (!dx && !dy) return { p: c, n: { x: 0, y: 0 } };
+                    const t = Math.min(
+                        dx ? r.w / 2 / Math.abs(dx) : Infinity,
+                        dy ? r.h / 2 / Math.abs(dy) : Infinity,
+                    );
+                    const len = Math.hypot(dx, dy);
+                    const nx = dx / len,
+                        ny = dy / len;
+                    return {
+                        p: {
+                            x: c.x + dx * t + nx * gap,
+                            y: c.y + dy * t + ny * gap,
+                        },
+                        n: { x: nx, y: ny },
+                    };
+                };
+
+                state.services.forEach((s) => {
+                    s.depends_on.forEach((d) => {
+                        const a = rects[s.id],
+                            b = rects[d.id];
+                        if (!a || !b) return;
+                        const ca = center(a),
+                            cb = center(b);
+                        const A = edge(a, cb, 3),
+                            B = edge(b, ca, 5);
+                        const k = Math.min(
+                            60,
+                            Math.hypot(B.p.x - A.p.x, B.p.y - A.p.y) / 2.5,
+                        );
+                        const path = `M${A.p.x},${A.p.y} C${A.p.x + A.n.x * k},${A.p.y + A.n.y * k} ${B.p.x + B.n.x * k},${B.p.y + B.n.y * k} ${B.p.x},${B.p.y}`;
+                        const attrs = {
+                            d: path,
+                            fill: "none",
+                            stroke: "var(--steel)",
+                            "stroke-width": "1.8",
+                            "marker-end": "url(#arrow)",
+                        };
+                        if (d.condition !== "service_started")
+                            attrs["stroke-dasharray"] = "5 4";
+                        svg.append(mk("path", attrs));
+                    });
+                });
+            }
+
+            /* =====================================================================
+            Darstellung: Volumes & Netzwerke
+            ===================================================================== */
+            function renderResources() {
+                const box = $("#resources");
+                box.replaceChildren();
+
+                const block = (kind) => {
+                    const isVol = kind === "volumes";
+                    const list = isVol ? state.volumes : state.networks;
+                    const usedBy = (r) =>
+                        state.services
+                            .filter((s) =>
+                                isVol
+                                    ? s.volumes.some(
+                                          (v) =>
+                                              isNamedVolumeSource(v.trim()) &&
+                                              volumeSource(v.trim()) ===
+                                                  r.name.trim(),
+                                      )
+                                    : s.networks.includes(r.id),
+                            )
+                            .map((s) => s.key || "(ohne Namen)");
+
+                    const sec = h(
+                        "section",
+                        { class: "res" },
+                        h("h3", {}, isVol ? "Volumes" : "Netzwerke"),
+                        h(
+                            "p",
+                            { class: "hint" },
+                            isVol
+                                ? "Benannte Volumes für persistente Daten. Bind-Mounts (./pfad) brauchen keinen Eintrag."
+                                : "Ohne Eintrag nutzen alle Dienste das Standardnetz des Projekts.",
+                        ),
+                    );
+
+                    list.forEach((r) => {
+                        let before = r.name;
+                        const nameIn = h("input", {
+                            type: "text",
+                            class: "mono",
+                            value: r.name,
+                            placeholder: "name",
+                            "aria-label": "Name",
+                            spellcheck: "false",
+                            onfocus: () => {
+                                before = r.name;
+                            },
+                            oninput: (e) => {
+                                r.name = e.target.value;
+                                e.target.classList.toggle(
+                                    "invalid",
+                                    !!r.name.trim() &&
+                                        !KEY_RE.test(r.name.trim()),
+                                );
+                                changed();
+                            },
+                            onchange: (e) => {
+                                if (isVol)
+                                    renameVolume(before.trim(), r.name.trim());
+                                before = r.name;
+                                changed();
+                                renderInspector();
+                                renderVolList();
+                            },
+                        });
+                        const drvIn = h("input", {
+                            type: "text",
+                            class: "mono",
+                            value: r.driver,
+                            placeholder: isVol
+                                ? "driver (local)"
+                                : "driver (bridge)",
+                            "aria-label": "Treiber",
+                            disabled: r.external || !!r.raw,
+                            oninput: (e) => {
+                                r.driver = e.target.value;
+                                changed();
+                            },
+                        });
+                        const ext = h(
+                            "label",
+                            {},
+                            h("input", {
+                                type: "checkbox",
+                                checked: r.external,
+                                disabled: !!r.raw,
+                                onchange: (e) => {
+                                    r.external = e.target.checked;
+                                    drvIn.disabled = r.external;
+                                    changed();
+                                },
+                            }),
+                            "extern",
+                        );
+                        const del = h(
+                            "button",
+                            {
+                                class: "icon-btn",
+                                type: "button",
+                                title: "Entfernen",
+                                "aria-label": `${r.name || "Eintrag"} entfernen`,
+                                onclick: () => {
+                                    if (isVol)
+                                        state.volumes = state.volumes.filter(
+                                            (x) => x !== r,
+                                        );
+                                    else {
+                                        state.networks = state.networks.filter(
+                                            (x) => x !== r,
+                                        );
+                                        state.services.forEach((s) => {
+                                            s.networks = s.networks.filter(
+                                                (id) => id !== r.id,
+                                            );
+                                        });
+                                    }
+                                    structural();
+                                },
+                            },
+                            "×",
+                        );
+                        sec.append(
+                            h(
+                                "div",
+                                { class: "res-row" },
+                                nameIn,
+                                drvIn,
+                                ext,
+                                del,
+                            ),
+                        );
+                        if (r.raw)
+                            sec.append(
+                                h(
+                                    "div",
+                                    { class: "res-used" },
+                                    "Optionen aus dem Import werden unverändert übernommen: ",
+                                    h(
+                                        "button",
+                                        {
+                                            class: "btn small",
+                                            type: "button",
+                                            onclick: () => {
+                                                r.raw = "";
+                                                structural();
+                                            },
+                                        },
+                                        "Optionen verwerfen",
+                                    ),
+                                ),
+                            );
+                        const used = usedBy(r);
+                        sec.append(
+                            h(
+                                "div",
+                                { class: "res-used" },
+                                used.length
+                                    ? `genutzt von: ${used.join(", ")}`
+                                    : "noch von keinem Dienst genutzt",
+                            ),
+                        );
+                    });
+
+                    sec.append(
+                        h(
+                            "button",
+                            {
+                                class: "btn small",
+                                type: "button",
+                                onclick: () => {
+                                    const base = isVol ? "daten" : "netz";
+                                    let n = list.length + 1;
+                                    while (
+                                        list.some(
+                                            (x) => x.name === `${base}${n}`,
+                                        )
+                                    )
+                                        n++;
+                                    list.push({
+                                        id: uid(isVol ? "v" : "n"),
+                                        name: `${base}${n}`,
+                                        driver: "",
+                                        external: false,
+                                    });
+                                    structural();
+                                },
+                            },
+                            isVol ? "Volume hinzufügen" : "Netzwerk hinzufügen",
+                        ),
+                    );
+                    return sec;
+                };
+                box.append(block("volumes"), block("networks"));
+                renderVolList();
+            }
+
+            function renderVolList() {
+                const dl = $("#volList");
+                dl.replaceChildren(
+                    ...state.volumes
+                        .filter((v) => v.name.trim())
+                        .map((v) =>
+                            h("option", { value: `${v.name.trim()}:` }),
+                        ),
+                );
+            }
+
+            /* =====================================================================
+            Darstellung: Eigenschaften
+            ===================================================================== */
+            function field(label, control, hint) {
+                return h(
+                    "label",
+                    { class: "field" },
+                    h("span", {}, label),
+                    control,
+                    hint ? h("small", { class: "hint" }, hint) : null,
+                );
+            }
+            function bindText(obj, prop, opts = {}) {
+                const el = h(opts.multiline ? "textarea" : "input", {
+                    type: opts.multiline ? null : "text",
+                    class: opts.mono ? "mono" : null,
+                    value: obj[prop] ?? "",
+                    placeholder: opts.placeholder || null,
+                    spellcheck: "false",
+                    autocomplete: "off",
+                    rows: opts.rows || null,
+                    list: opts.list || null,
+                    oninput: (e) => {
+                        obj[prop] = e.target.value;
+                        if (opts.validate)
+                            e.target.classList.toggle(
+                                "invalid",
+                                !opts.validate(e.target.value),
+                            );
+                        changed();
+                    },
+                    onchange: opts.onchange || null,
+                });
+                if (opts.validate)
+                    el.classList.toggle("invalid", !opts.validate(el.value));
+                return el;
+            }
+
+            function listEditor(title, arr, placeholder, opts = {}) {
+                const grp = h(
+                    "div",
+                    { class: "group" },
+                    h(
+                        "h4",
+                        {},
+                        title,
+                        h(
+                            "button",
+                            {
+                                class: "btn small",
+                                type: "button",
+                                onclick: () => {
+                                    arr.push(opts.pair ? ["", ""] : "");
+                                    renderInspector();
+                                    structuralLight();
+                                    const rows = document.querySelectorAll(
+                                        `[data-list="${title}"] input`,
+                                    );
+                                    const target = opts.pair
+                                        ? rows[rows.length - 2]
+                                        : rows[rows.length - 1];
+                                    if (target) target.focus();
+                                },
+                            },
+                            "Hinzufügen",
+                        ),
+                    ),
+                );
+                const wrap = h("div", { "data-list": title });
+                arr.forEach((item, i) => {
+                    const del = h(
+                        "button",
+                        {
+                            class: "icon-btn",
+                            type: "button",
+                            title: "Entfernen",
+                            "aria-label": "Zeile entfernen",
+                            onclick: () => {
+                                arr.splice(i, 1);
+                                renderInspector();
+                                structuralLight();
+                            },
+                        },
+                        "×",
+                    );
+                    if (opts.pair) {
+                        wrap.append(
+                            h(
+                                "div",
+                                { class: "row env" },
+                                h("input", {
+                                    type: "text",
+                                    class: "mono",
+                                    value: item[0],
+                                    placeholder: "SCHLÜSSEL",
+                                    "aria-label": "Variable",
+                                    spellcheck: "false",
+                                    oninput: (e) => {
+                                        item[0] = e.target.value;
+                                        changed();
+                                    },
+                                }),
+                                h("input", {
+                                    type: "text",
+                                    class: "mono",
+                                    value: item[1],
+                                    placeholder: "Wert",
+                                    "aria-label": "Wert",
+                                    spellcheck: "false",
+                                    oninput: (e) => {
+                                        item[1] = e.target.value;
+                                        changed();
+                                    },
+                                }),
+                                del,
+                            ),
+                        );
+                    } else {
+                        wrap.append(
+                            h(
+                                "div",
+                                { class: "row" },
+                                h("input", {
+                                    type: "text",
+                                    class: "mono",
+                                    value: item,
+                                    placeholder,
+                                    "aria-label": title,
+                                    spellcheck: "false",
+                                    list: opts.list || null,
+                                    oninput: (e) => {
+                                        arr[i] = e.target.value;
+                                        changed();
+                                    },
+                                    onchange: opts.onchange || null,
+                                }),
+                                del,
+                            ),
+                        );
+                    }
+                });
+                if (!arr.length && opts.empty)
+                    wrap.append(
+                        h(
+                            "p",
+                            { class: "hint", style: "margin:0 0 6px" },
+                            opts.empty,
+                        ),
+                    );
+                grp.append(wrap);
+                return grp;
+            }
+
+            function renderInspector() {
+                const box = $("#inspector");
+                box.replaceChildren();
+                const s = svcById(selectedId);
+
+                if (!s) {
+                    box.append(
+                        h("h3", {}, "Kein Dienst ausgewählt"),
+                        h(
+                            "p",
+                            { class: "hint" },
+                            "Einen Dienst auf der Arbeitsfläche anklicken, um Image, Ports, Variablen, Volumes und Abhängigkeiten zu bearbeiten.",
+                        ),
+                        h(
+                            "div",
+                            { class: "group" },
+                            h("h4", {}, "Weitere Top-Level-Einträge"),
+                            h(
+                                "p",
+                                { class: "hint", style: "margin-top:0" },
+                                "Roh-YAML, das unverändert ans Dateiende angehängt wird, z. B. secrets, configs oder x-Erweiterungen.",
+                            ),
+                            bindText(state, "extra", {
+                                multiline: true,
+                                rows: 7,
+                                placeholder:
+                                    "secrets:\n  db_password:\n    file: ./secrets/db_password.txt",
+                            }),
+                        ),
+                    );
+                    return;
+                }
+
+                box.append(h("h3", {}, s.key || "(ohne Namen)"));
+
+                // Grunddaten
+                box.append(
+                    h(
+                        "div",
+                        { class: "group" },
+                        field(
+                            "Dienstname",
+                            bindText(s, "key", {
+                                mono: true,
+                                placeholder: "z. B. db",
+                                validate: (v) => KEY_RE.test(v.trim()),
+                                onchange: () => renderInspector(),
+                            }),
+                        ),
+                        field(
+                            "Image",
+                            bindText(s, "image", {
+                                mono: true,
+                                placeholder: "z. B. postgres:16-alpine",
+                            }),
+                        ),
+                        field(
+                            "Build-Kontext",
+                            bindText(s, "build", {
+                                mono: true,
+                                placeholder: "z. B. . oder ./app",
+                            }),
+                            "Alternativ oder zusätzlich zum Image.",
+                        ),
+                        field(
+                            "container_name",
+                            bindText(s, "container_name", {
+                                mono: true,
+                                placeholder: "optional",
+                            }),
+                        ),
+                        field(
+                            "Neustart-Richtlinie",
+                            (() => {
+                                const sel = h(
+                                    "select",
+                                    {
+                                        onchange: (e) => {
+                                            s.restart = e.target.value;
+                                            changed();
+                                        },
+                                    },
+                                    RESTART_OPTS.map((o) =>
+                                        h(
+                                            "option",
+                                            { value: o },
+                                            o || "(nicht gesetzt)",
+                                        ),
+                                    ),
+                                );
+                                sel.value = s.restart;
+                                return sel;
+                            })(),
+                        ),
+                        field(
+                            "working_dir",
+                            bindText(s, "working_dir", {
+                                mono: true,
+                                placeholder: "optional",
+                            }),
+                        ),
+                        field(
+                            "command",
+                            bindText(s, "command", {
+                                mono: true,
+                                placeholder: "optional",
+                            }),
+                        ),
+                    ),
+                );
+
+                box.append(
+                    listEditor("Ports", s.ports, "8080:80", {
+                        empty: "Keine Ports veröffentlicht.",
+                    }),
+                );
+                box.append(
+                    listEditor("Umgebungsvariablen", s.environment, "", {
+                        pair: true,
+                        empty: "Keine Variablen gesetzt.",
+                    }),
+                );
+                box.append(
+                    listEditor(
+                        "Volumes & Mounts",
+                        s.volumes,
+                        "daten:/pfad/im/container",
+                        {
+                            list: "volList",
+                            empty: "Keine Volumes eingebunden.",
+                            onchange: () => {
+                                renderResources();
+                            },
+                        },
+                    ),
+                );
+
+                // Netzwerke
+                const netGrp = h(
+                    "div",
+                    { class: "group" },
+                    h("h4", {}, "Netzwerke"),
+                );
+                if (!state.networks.length) {
+                    netGrp.append(
+                        h(
+                            "p",
+                            { class: "hint", style: "margin:0 0 6px" },
+                            "Keine Netzwerke deklariert; der Dienst nutzt das Standardnetz.",
+                        ),
+                    );
+                } else {
+                    state.networks.forEach((n) => {
+                        netGrp.append(
+                            h(
+                                "label",
+                                { class: "check" },
+                                h("input", {
+                                    type: "checkbox",
+                                    checked: s.networks.includes(n.id),
+                                    onchange: (e) => {
+                                        s.networks = e.target.checked
+                                            ? [...s.networks, n.id]
+                                            : s.networks.filter(
+                                                  (id) => id !== n.id,
+                                              );
+                                        changed();
+                                        renderResources();
+                                    },
+                                }),
+                                h(
+                                    "span",
+                                    { class: "mono" },
+                                    n.name || "(ohne Namen)",
+                                ),
+                            ),
+                        );
+                    });
+                }
+                box.append(netGrp);
+
+                // Abhängigkeiten
+                const others = state.services.filter((x) => x.id !== s.id);
+                const depGrp = h(
+                    "div",
+                    { class: "group" },
+                    h("h4", {}, "Abhängigkeiten (depends_on)"),
+                );
+                if (!others.length)
+                    depGrp.append(
+                        h(
+                            "p",
+                            { class: "hint", style: "margin:0 0 6px" },
+                            "Weitere Dienste hinzufügen, um Abhängigkeiten festzulegen.",
+                        ),
+                    );
+                others.forEach((o) => {
+                    const dep = s.depends_on.find((d) => d.id === o.id);
+                    const sel = h(
+                        "select",
+                        {
+                            "aria-label": `Bedingung für ${o.key}`,
+                            disabled: !dep,
+                            onchange: (e) => {
+                                const d = s.depends_on.find(
+                                    (x) => x.id === o.id,
+                                );
+                                if (d) {
+                                    d.condition = e.target.value;
+                                    changed();
+                                }
+                            },
+                        },
+                        COND_OPTS.map(([v, l]) => h("option", { value: v }, l)),
+                    );
+                    sel.value = dep ? dep.condition : "service_started";
+                    depGrp.append(
+                        h(
+                            "div",
+                            { class: "dep-row" },
+                            h(
+                                "label",
+                                {},
+                                h("input", {
+                                    type: "checkbox",
+                                    checked: !!dep,
+                                    onchange: (e) => {
+                                        if (e.target.checked)
+                                            s.depends_on.push({
+                                                id: o.id,
+                                                condition: o.hc.test.trim()
+                                                    ? "service_healthy"
+                                                    : "service_started",
+                                            });
+                                        else
+                                            s.depends_on = s.depends_on.filter(
+                                                (d) => d.id !== o.id,
+                                            );
+                                        renderInspector();
+                                        changed();
+                                    },
+                                }),
+                                h(
+                                    "span",
+                                    { class: "mono" },
+                                    o.key || "(ohne Namen)",
+                                ),
+                            ),
+                            sel,
+                        ),
+                    );
+                });
+                box.append(depGrp);
+
+                // Healthcheck
+                const hcGrp = h(
+                    "details",
+                    { class: "group", open: s.hc.test.trim() ? true : null },
+                    h("summary", {}, "Healthcheck"),
+                    field(
+                        "test",
+                        bindText(s.hc, "test", {
+                            mono: true,
+                            placeholder:
+                                "z. B. curl -f http://localhost/ || exit 1",
+                        }),
+                        "Wird als Shell-Befehl (CMD-SHELL) ausgeführt. Eine Liste in eckigen Klammern wird unverändert übernommen.",
+                    ),
+                    h(
+                        "div",
+                        { class: "grid3" },
+                        field(
+                            "interval",
+                            bindText(s.hc, "interval", {
+                                mono: true,
+                                placeholder: "10s",
+                            }),
+                        ),
+                        field(
+                            "timeout",
+                            bindText(s.hc, "timeout", {
+                                mono: true,
+                                placeholder: "5s",
+                            }),
+                        ),
+                        field(
+                            "retries",
+                            bindText(s.hc, "retries", {
+                                mono: true,
+                                placeholder: "5",
+                            }),
+                        ),
+                    ),
+                );
+                box.append(hcGrp);
+
+                // Weitere Einträge
+                box.append(
+                    h(
+                        "details",
+                        { class: "group", open: s.extra.trim() ? true : null },
+                        h("summary", {}, "Weitere Einträge (Roh-YAML)"),
+                        h(
+                            "p",
+                            { class: "hint", style: "margin-top:0" },
+                            "Ohne Einrückung eingeben; der Text wird unter dem Dienst eingerückt eingefügt, z. B. labels, env_file, deploy, logging.",
+                        ),
+                        bindText(s, "extra", {
+                            multiline: true,
+                            rows: 5,
+                            placeholder:
+                                "env_file:\n  - .env\nlabels:\n  - traefik.enable=true",
+                        }),
+                    ),
+                );
+
+                const idx = state.services.indexOf(s);
+                box.append(
+                    h(
+                        "div",
+                        { class: "insp-actions" },
+                        h(
+                            "button",
+                            {
+                                class: "btn small",
+                                type: "button",
+                                disabled: idx === 0,
+                                onclick: () => moveService(s.id, -1),
+                            },
+                            "Nach vorn",
+                        ),
+                        h(
+                            "button",
+                            {
+                                class: "btn small",
+                                type: "button",
+                                disabled: idx === state.services.length - 1,
+                                onclick: () => moveService(s.id, 1),
+                            },
+                            "Nach hinten",
+                        ),
+                        h(
+                            "button",
+                            {
+                                class: "btn small",
+                                type: "button",
+                                onclick: () => duplicateService(s.id),
+                            },
+                            "Duplizieren",
+                        ),
+                        h(
+                            "button",
+                            {
+                                class: "btn small danger",
+                                type: "button",
+                                onclick: () => removeService(s.id),
+                            },
+                            "Dienst entfernen",
+                        ),
+                    ),
+                );
+            }
+
+            /* =====================================================================
+            Darstellung: YAML & Prüfung
+            ===================================================================== */
+            function renderYaml() {
+                const y = toYaml();
+                $("#yamlOut").innerHTML = highlightYaml(y);
+                const lines = y.split("\n").length - 1;
+                $("#yamlInfo").textContent = `${lines} Zeilen`;
+            }
+
+            function renderIssues() {
+                const box = $("#issues");
+                box.replaceChildren();
+                if (!issuesCache.length) {
+                    box.append(
+                        h(
+                            "p",
+                            { class: "ok" },
+                            state.services.length
+                                ? "Keine Auffälligkeiten gefunden."
+                                : "Noch nichts zu prüfen.",
+                        ),
+                    );
+                    return;
+                }
+                const order = { error: 0, warn: 1 };
+                const ul = h("ul", {});
+                [...issuesCache]
+                    .sort((a, b) => order[a.level] - order[b.level])
+                    .forEach((i) => {
+                        const text = i.svcId
+                            ? h(
+                                  "button",
+                                  {
+                                      type: "button",
+                                      onclick: () => {
+                                          selectedId = i.svcId;
+                                          showTab("insp");
+                                          renderTiles();
+                                          renderInspector();
+                                      },
+                                  },
+                                  i.msg,
+                              )
+                            : h("span", {}, i.msg);
+                        ul.append(
+                            h(
+                                "li",
+                                {},
+                                h(
+                                    "span",
+                                    { class: `lvl ${i.level}` },
+                                    i.level === "error" ? "Fehler" : "Hinweis",
+                                ),
+                                text,
+                            ),
+                        );
+                    });
+                box.append(ul);
+            }
+
+            function changed() {
+                issuesCache = validate();
+                save();
+                renderTiles();
+                renderYaml();
+                renderIssues();
+            }
+            function structuralLight() {
+                changed();
+            }
+            function structural() {
+                changed();
+                renderResources();
+                renderInspector();
+            }
+            function renderAll() {
+                $("#projName").value = state.name;
+                structural();
+            }
+
+            /* =====================================================================
+            Tabs
+            ===================================================================== */
+            function showTab(which) {
+                const insp = which === "insp";
+                $("#tabInsp").setAttribute("aria-selected", insp);
+                $("#tabYaml").setAttribute("aria-selected", !insp);
+                $("#inspPanel").hidden = !insp;
+                $("#yamlPanel").hidden = insp;
+            }
+
+            /* =====================================================================
+            Import
+            ===================================================================== */
+            function importYaml(text) {
+                if (typeof jsyaml === "undefined") {
+                    toast(
+                        "Import nicht verfügbar: Die Bibliothek js-yaml konnte nicht von cdnjs geladen werden (Internetverbindung prüfen).",
+                        5000,
+                    );
+                    return;
+                }
+                let doc;
+                try {
+                    doc = jsyaml.load(text);
+                } catch (e) {
+                    toast(
+                        `YAML konnte nicht gelesen werden: ${e.reason || e.message}`,
+                        6000,
+                    );
+                    return;
+                }
+                if (
+                    !doc ||
+                    typeof doc !== "object" ||
+                    !doc.services ||
+                    typeof doc.services !== "object"
+                ) {
+                    toast(
+                        "Die Datei enthält keinen Abschnitt „services“.",
+                        5000,
+                    );
+                    return;
+                }
+
+                const notes = [];
+                const dump = (obj) =>
+                    jsyaml.dump(obj, { lineWidth: -1, noRefs: true }).trimEnd();
+                const next = emptyState();
+                next.name = typeof doc.name === "string" ? doc.name : "";
+
+                const parseRes = (src, kind, prefix) => {
+                    if (!src || typeof src !== "object") return [];
+                    return Object.entries(src).map(([name, cfg]) => {
+                        const r = {
+                            id: uid(prefix),
+                            name,
+                            driver: "",
+                            external: false,
+                            raw: "",
+                        };
+                        if (cfg && typeof cfg === "object") {
+                            const rest = Object.keys(cfg).filter(
+                                (k) => !["driver", "external"].includes(k),
+                            );
+                            if (
+                                rest.length ||
+                                (cfg.external &&
+                                    typeof cfg.external !== "boolean")
+                            )
+                                r.raw = dump(cfg);
+                            else {
+                                if (typeof cfg.driver === "string")
+                                    r.driver = cfg.driver;
+                                if (cfg.external === true) r.external = true;
+                            }
+                        }
+                        return r;
+                    });
+                };
+                next.volumes = parseRes(doc.volumes, "volumes", "v");
+                next.networks = parseRes(doc.networks, "networks", "n");
+                const netId = (name) => {
+                    let n = next.networks.find((x) => x.name === name);
+                    if (!n) {
+                        n = { id: uid("n"), name, driver: "", external: false };
+                        next.networks.push(n);
+                        notes.push(
+                            `Netzwerk „${name}“ war nicht deklariert und wurde ergänzt`,
+                        );
+                    }
+                    return n.id;
+                };
+
+                const pendingDeps = [];
+                for (const [key, cfg0] of Object.entries(doc.services)) {
+                    const cfg = { ...(cfg0 || {}) };
+                    const s = newService({ key });
+                    const extra = {};
+                    const take = (k) => {
+                        const v = cfg[k];
+                        delete cfg[k];
+                        return v;
+                    };
+
+                    for (const k of [
+                        "image",
+                        "container_name",
+                        "restart",
+                        "working_dir",
+                    ]) {
+                        const v = take(k);
+                        if (v == null) continue;
+                        if (typeof v === "string" || typeof v === "number")
+                            s[k] = String(v);
+                        else extra[k] = v;
+                    }
+                    const build = take("build");
+                    if (typeof build === "string") s.build = build;
+                    else if (build != null) extra.build = build;
+                    const cmd = take("command");
+                    if (typeof cmd === "string") s.command = cmd;
+                    else if (cmd != null) extra.command = cmd;
+
+                    const ports = take("ports");
+                    if (Array.isArray(ports)) {
+                        if (ports.some((p) => p && typeof p === "object"))
+                            extra.ports = ports;
+                        else s.ports = ports.map(String);
+                    } else if (ports != null) extra.ports = ports;
+                    const env = take("environment");
+                    if (Array.isArray(env))
+                        s.environment = env.map((e) => {
+                            const t = String(e);
+                            const i = t.indexOf("=");
+                            return i < 0
+                                ? [t, ""]
+                                : [t.slice(0, i), t.slice(i + 1)];
+                        });
+                    else if (env && typeof env === "object")
+                        s.environment = Object.entries(env).map(([k, v]) => [
+                            k,
+                            v == null ? "" : String(v),
+                        ]);
+
+                    const vols = take("volumes");
+                    if (Array.isArray(vols)) {
+                        if (vols.some((v) => v && typeof v === "object"))
+                            extra.volumes = vols;
+                        else s.volumes = vols.map(String);
+                    } else if (vols != null) extra.volumes = vols;
+                    const nets = take("networks");
+                    if (Array.isArray(nets))
+                        s.networks = nets.map((n) => netId(String(n)));
+                    else if (nets && typeof nets === "object") {
+                        if (
+                            Object.values(nets).some(
+                                (c) =>
+                                    c &&
+                                    typeof c === "object" &&
+                                    Object.keys(c).length,
+                            )
+                        ) {
+                            extra.networks = nets;
+                            Object.keys(nets).forEach((n) => netId(n));
+                        } else
+                            Object.keys(nets).forEach((n) =>
+                                s.networks.push(netId(n)),
+                            );
+                    }
+                    const deps = take("depends_on");
+                    if (Array.isArray(deps))
+                        deps.forEach((d) =>
+                            pendingDeps.push({
+                                s,
+                                key: String(d),
+                                condition: "service_started",
+                            }),
+                        );
+                    else if (deps && typeof deps === "object") {
+                        if (
+                            Object.values(deps).some(
+                                (c) =>
+                                    c &&
+                                    Object.keys(c).some(
+                                        (k) => k !== "condition",
+                                    ),
+                            )
+                        )
+                            extra.depends_on = deps;
+                        else
+                            Object.entries(deps).forEach(([d, c]) =>
+                                pendingDeps.push({
+                                    s,
+                                    key: d,
+                                    condition:
+                                        (c && c.condition) || "service_started",
+                                }),
+                            );
+                    }
+
+                    const hc = take("healthcheck");
+                    if (hc && typeof hc === "object") {
+                        const known = [
+                            "test",
+                            "interval",
+                            "timeout",
+                            "retries",
+                        ];
+                        const simpleTest =
+                            typeof hc.test === "string" ||
+                            Array.isArray(hc.test);
+                        if (
+                            !simpleTest ||
+                            Object.keys(hc).some((k) => !known.includes(k))
+                        )
+                            extra.healthcheck = hc;
+                        else {
+                            s.hc.test =
+                                typeof hc.test === "string"
+                                    ? hc.test
+                                    : hc.test[0] === "CMD-SHELL" &&
+                                        hc.test.length === 2
+                                      ? String(hc.test[1])
+                                      : JSON.stringify(hc.test);
+                            for (const k of ["interval", "timeout", "retries"])
+                                if (hc[k] != null) s.hc[k] = String(hc[k]);
+                        }
+                    } else if (hc != null) extra.healthcheck = hc;
+
+                    Object.assign(extra, cfg);
+                    if (Object.keys(extra).length) s.extra = dump(extra);
+                    next.services.push(s);
+                }
+
+                pendingDeps.forEach(({ s, key, condition }) => {
+                    const t = next.services.find((x) => x.key === key);
+                    if (t) s.depends_on.push({ id: t.id, condition });
+                    else
+                        notes.push(
+                            `${s.key}: Abhängigkeit „${key}“ verweist auf keinen Dienst`,
+                        );
+                });
+
+                const topExtra = {};
+                for (const [k, v] of Object.entries(doc)) {
+                    if (["name", "services", "volumes", "networks"].includes(k))
+                        continue;
+                    if (k === "version") {
+                        notes.push(
+                            "„version“ entfernt (in der Compose-Spezifikation obsolet)",
+                        );
+                        continue;
+                    }
+                    topExtra[k] = v;
+                }
+                if (Object.keys(topExtra).length) next.extra = dump(topExtra);
+
+                state = next;
+                selectedId = null;
+                renderAll();
+                toast(
+                    notes.length
+                        ? `Importiert. Hinweise: ${notes.join("; ")}.`
+                        : `Importiert: ${state.services.length} Dienste.`,
+                    notes.length ? 9000 : 2600,
+                );
+            }
+
+            /* =====================================================================
+            Kopieren & Herunterladen
+            ===================================================================== */
+            async function copyYaml() {
+                const text = toYaml();
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch (e) {
+                    const ta = h("textarea", {
+                        value: text,
+                        style: "position:fixed;left:-9999px",
+                    });
+                    document.body.append(ta);
+                    ta.select();
+                    try {
+                        document.execCommand("copy");
+                    } catch (e2) {
+                        toast(
+                            "Kopieren nicht möglich. Bitte aus der YAML-Vorschau markieren.",
+                        );
+                        ta.remove();
+                        return;
+                    }
+                    ta.remove();
+                }
+                toast("YAML kopiert.");
+            }
+
+            function downloadYaml() {
+                const errors = issuesCache.filter(
+                    (i) => i.level === "error",
+                ).length;
+                const blob = new Blob([toYaml()], {
+                    type: "text/yaml;charset=utf-8",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = h("a", { href: url, download: "docker-compose.yml" });
+                document.body.append(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1500);
+                toast(
+                    errors
+                        ? `docker-compose.yml heruntergeladen – enthält noch ${errors} Fehler laut Prüfung.`
+                        : "docker-compose.yml heruntergeladen.",
+                    errors ? 4500 : 2400,
+                );
+            }
+
+            /* =====================================================================
+            Ereignisse
+            ===================================================================== */
+            $("#paletteFilter").addEventListener("input", renderPalette);
+            $("#projName").addEventListener("input", (e) => {
+                state.name = e.target.value;
+                e.target.classList.toggle(
+                    "invalid",
+                    !!state.name.trim() && !PROJECT_RE.test(state.name.trim()),
+                );
+                changed();
+            });
+            $("#btnCopy").addEventListener("click", copyYaml);
+            $("#btnCopy2").addEventListener("click", copyYaml);
+            $("#btnDownload").addEventListener("click", downloadYaml);
+            $("#btnNew").addEventListener("click", () => {
+                if (
+                    state.services.length &&
+                    !confirm("Alle Dienste, Volumes und Netzwerke verwerfen?")
+                )
+                    return;
+                state = emptyState();
+                selectedId = null;
+                renderAll();
+            });
+            $("#btnImport").addEventListener("click", () =>
+                $("#fileImport").click(),
+            );
+            $("#fileImport").addEventListener("change", async (e) => {
+                const f = e.target.files[0];
+                if (!f) return;
+                if (
+                    state.services.length &&
+                    !confirm(
+                        "Die aktuelle Konfiguration wird durch den Import ersetzt. Fortfahren?",
+                    )
+                ) {
+                    e.target.value = "";
+                    return;
+                }
+                importYaml(await f.text());
+                e.target.value = "";
+            });
+            $("#tabInsp").addEventListener("click", () => showTab("insp"));
+            $("#tabYaml").addEventListener("click", () => showTab("yaml"));
+
+            const board = $("#board");
+            board.addEventListener("dragover", (e) => {
+                if (
+                    [...e.dataTransfer.types].includes(
+                        "text/x-compose-template",
+                    )
+                ) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "copy";
+                    board.classList.add("drag-over");
+                }
+            });
+            board.addEventListener("dragleave", (e) => {
+                if (!board.contains(e.relatedTarget))
+                    board.classList.remove("drag-over");
+            });
+            board.addEventListener("drop", (e) => {
+                e.preventDefault();
+                board.classList.remove("drag-over");
+                const id = e.dataTransfer.getData("text/x-compose-template");
+                if (id) addFromTemplate(id);
+            });
+            board.addEventListener("click", (e) => {
+                if (e.target === board || e.target.id === "tiles") {
+                    selectedId = null;
+                    renderTiles();
+                    renderInspector();
+                }
+            });
+            if ("ResizeObserver" in window)
+                new ResizeObserver(() => drawLinks()).observe(board);
+            else window.addEventListener("resize", drawLinks);
+
+            /* =====================================================================
+            Start
+            ===================================================================== */
+            load();
+            renderPalette();
+            renderAll();
+        </script>
+    </body>
+</html>

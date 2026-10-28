@@ -1,6 +1,6 @@
 module namespace conv = 'http://le-tex.de/converter';
 
-declare variable $conv:converters := doc("converter.xml")/converters/converter;
+declare variable $conv:converters := doc("/opt/basex/install/transpectui/converter.xml")/converters/converter;
 
 declare function conv:get-all() as element(converter)*{
   $conv:converters

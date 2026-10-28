@@ -1,8 +1,8 @@
 code/*
 data/*
-src/transpectui/converter.xml
-src/transpectui/config.xml
-src/transpectui/users.xml
+src/repo/converter.xml
+src/repo/config.xml
+src/repo/users.xml
 src/static/WEB-INF
 docker/docker-compose.yml
 .env
