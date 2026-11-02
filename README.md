@@ -7,19 +7,17 @@ BaseX based UI for transpect converters. Currently uses BaseX 13.
 ### Functionalities:
 
 * per converter UI definition
+* per converter file duplication limits
 * localization support
 * Worker/Frontend architecture
 * Queuing
 * User-Managment
 * API
-* (new) FloorManager - enables a global queue
+* Global Queue
 
 ### Missing Features
 
 * Post Conversion Actions
-
-### Necessary Modifications to Conversion Makefiles
-* `conversion` target definition must end with a colon (`:`)
 
 ### Running TranspectUI
 
@@ -30,7 +28,7 @@ BaseX based UI for transpect converters. Currently uses BaseX 13.
 ##### Create Images
 
 - Change admin password in `/.env`
-- Build worker-images (1 converter per worker) via `scripts/buildWorker.sh`. The Dockerfile in the background copies transpect/infrastruture/ui/converter.xml into the Image.
+- Build worker-images (usually 1 converter per worker) via `scripts/buildWorker.sh`. The Dockerfile in the background copies transpect/infrastruture/ui/converter.xml into the Image.
 - Example: ./buildWorker.sh swp <svnurl> <revision> <svnuser> <svnpw>
 - Create Converter Frontend Docker Images via `/scripts/buildUI.sh`. The name of the image will be `transpectui`.
 
