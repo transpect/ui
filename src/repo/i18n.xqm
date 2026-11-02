@@ -10,14 +10,16 @@ declare variable $i18n:languages :=
 declare variable $i18n:static-replacements := 
   <static-replacements>
     <static-replacement tag="upload">
-      <replacement lang="de">Daten hochladen</replacement>
-      <replacement lang="en">Upload Data</replacement>
-      <replacement lang="es">Subir Datos</replacement>
-      <replacement lang="fr">Télécharger des données</replacement>
+      <replacement lang="de">Datei hochladen und Konvertierung starten</replacement>
+      <replacement lang="en">Upload Data and start Conversion</replacement>
+      <replacement lang="es">Subir Datos e iniciar la conversión</replacement>
+      <replacement lang="fr">Téléverser le fichier et lancer la conversion</replacement>
     </static-replacement>
     <static-replacement tag="prev-conversions">
       <replacement lang="de">Vorherige Konvertierungen</replacement>
       <replacement lang="en">Previous Conversions</replacement>
+      <replacement lang="es">Conversiones anteriores</replacement>
+      <replacement lang="fr">Conversions précédentes</replacement>
     </static-replacement>
     <static-replacement tag="submit-file">
       <replacement lang="de">Hochladen</replacement>
@@ -262,10 +264,86 @@ declare variable $i18n:static-replacements :=
     <static-replacement tag="dragDrop">
       <replacement lang="de">Ziehen Sie eine Datei hierher</replacement>
       <replacement lang="en">Drag and drop your file here</replacement>
+      <replacement lang="es">Arrastra y suelta tu archivo aquí</replacement>
+      <replacement lang="fr">Faites glisser et déposez votre fichier ici</replacement>
     </static-replacement>
     <static-replacement tag="clickToChoose">
       <replacement lang="de">oder klicken Sie um eine Datei auszuwählen</replacement>
       <replacement lang="en">or click to choose a file</replacement>
+      <replacement lang="es">o haz clic para elegir un archivo</replacement>
+      <replacement lang="fr">ou cliquez pour choisir un fichier</replacement>
+    </static-replacement>
+    <static-replacement tag="status">
+      <replacement lang="de">Status</replacement>
+      <replacement lang="en">Status</replacement>
+    </static-replacement>
+    <static-replacement tag="actions">
+      <replacement lang="de">Aktionen</replacement>
+      <replacement lang="en">Actions</replacement>
+    </static-replacement>
+    <static-replacement tag="error">
+      <replacement lang="de">Fehler</replacement>
+      <replacement lang="en">Error</replacement>
+    </static-replacement>
+    <static-replacement tag="auto-refresh">
+      <replacement lang="de">aktualisiert sich automatisch</replacement>
+      <replacement lang="en">updates automatically</replacement>
+    </static-replacement>
+    <static-replacement tag="parameters">
+      <replacement lang="de">Parameter</replacement>
+      <replacement lang="en">Parameters</replacement>
+    </static-replacement>
+    <static-replacement tag="duration">
+      <replacement lang="de">Dauer</replacement>
+      <replacement lang="en">Duration</replacement>
+    </static-replacement>
+    <static-replacement tag="job-messages">
+      <replacement lang="de">Job-Meldungen</replacement>
+      <replacement lang="en">Job Messages</replacement>
+    </static-replacement>
+    <static-replacement tag="back-to-list">
+      <replacement lang="de">Zur Liste</replacement>
+      <replacement lang="en">Back to list</replacement>
+    </static-replacement>
+    <static-replacement tag="download">
+      <replacement lang="de">Herunterladen</replacement>
+      <replacement lang="en">Download</replacement>
+    </static-replacement>
+    <static-replacement tag="online">
+      <replacement lang="de">Online</replacement>
+      <replacement lang="en">Online</replacement>
+    </static-replacement>
+    <static-replacement tag="offline">
+      <replacement lang="de">Offline</replacement>
+      <replacement lang="en">Offline</replacement>
+    </static-replacement>
+    <static-replacement tag="show-report">
+      <replacement lang="de">Bericht anzeigen</replacement>
+      <replacement lang="en">View report</replacement>
+    </static-replacement>
+    <static-replacement tag="no-messages">
+      <replacement lang="de">Keine Meldungen.</replacement>
+      <replacement lang="en">No Messages.</replacement>
+    </static-replacement>
+    <static-replacement tag="no-sessions">
+      <replacement lang="de">Keine aktiven Sitzungen.</replacement>
+      <replacement lang="en">No active Sessions.</replacement>
+    </static-replacement>
+    <static-replacement tag="no-results">
+      <replacement lang="de">Noch keine Ergebnisse.</replacement>
+      <replacement lang="en">No Results yet.</replacement>
+    </static-replacement>
+    <static-replacement tag="automatic-update">
+      <replacement lang="de">Protokoll folgt automatisch</replacement>
+      <replacement lang="en">Automatic Update</replacement>
+    </static-replacement>
+    <static-replacement tag="running-single">
+      <replacement lang="de">läuft</replacement>
+      <replacement lang="en">running</replacement>
+    </static-replacement>
+    <static-replacement tag="running-multi">
+      <replacement lang="de">laufen</replacement>
+      <replacement lang="en">running</replacement>
     </static-replacement>
   </static-replacements>;
 
@@ -273,7 +351,7 @@ declare function i18n:val($tag, $lang) {
   i18n:static-replacement($tag, $lang)
 };
 declare function i18n:static-replacement($tag, $lang) {
-  $i18n:static-replacements/static-replacement[@tag eq $tag]/replacement[@lang eq $lang]/text()
+  ($i18n:static-replacements/static-replacement[@tag eq $tag]/replacement[@lang eq $lang]/text(),$i18n:static-replacements/static-replacement[@tag eq $tag]/replacement[@lang eq 'en']/text())[1]
 };
 
 declare function i18n:name($input, $lang as xs:string := 'de') as xs:string{

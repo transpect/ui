@@ -7,4 +7,4 @@ restart:
 build:
 	cd scripts; ./buildAll.sh
 rebuild:
-	make stop; make build; make start
+	make build; make start

@@ -51,45 +51,130 @@ function ui:default($lang) {
   return (
     ui:check((), $lang, $url),
     let $content := (
+        ui:page-intro($context,
+          i18n:val('converters',$lang),
+          'Prüfen und konvertieren Sie Ihre Dokumente mit den verfügbaren Produktionspipelines.'),
+        element section {
+          attribute class {'tx-section'},
           element div {
-            attribute class {'well'},
-            element h2 {i18n:val('converters',$lang)},
-            for $c in $converters
-            let $allowed := ui:can-do($username,$url || 'converter/' || $c/@id)
-            return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/converter/' || $c/@id,(),$allowed)
-          }[count($converters) gt 0 ],
-          element div {
-            attribute class {'well'},
-            element h2 {i18n:val('workers',$lang)},
-            for $w in $workers
-            let $cs as element(converter)* := tr:get-worker-converter($w)
-            return
-              (
-                element h3 {
-                  attribute class {'ml-10'},
-                  xs:string($w/@name)},
-                for $c in $cs
-                let $allowed := ui:can-do($username,'/worker/' || $c/@worker || '/converter/' || $c/@id)
-                return ui:create-anchor($context, xs:string($c/@name),'/' || $lang || '/worker/' || $c/@worker || '/converter/' || $c/@id,'ml-20',$allowed)
-              )
-          }[count($workers) gt 0 ]),
-        $description := 
-          element div {
-            attribute class {'well'},
-            element h2 {'Startseite'},
-            element ul {
-            attribute class {'description'},
-              element li {'Konverter'},
+            attribute class {'tx-section-heading'},
+            element h2 {i18n:val('converters',$lang)}
+          },
+          for $c in $converters
+          let $allowed := ui:can-do($username,'/converter/' || $c/@id),
+              $runs as element(run)* := tr:get-runs($c),
+              $running := count($runs[status = ('pending','running')]),
+              $finished := count($runs[not(status = ('pending','running'))]),
+              $desc := $c/xs:string(@description),
+              $card := element span {
+                attribute class {'tx-converter-icon'},
+                ui:icon('shield', 24)
+              }
+          return
+            if ($allowed)
+            then element a {
+              attribute class {'tx-converter-card'},
+              attribute href {config:url('/' || $lang || '/converter/' || $c/@id)},
+              $card,
               element span {
-                'Auflistung der lokal installierten Konverter.'
-              },
-              element li {'Worker'},
-              element span {
-                'Auflistung der auf anderen Workern installierter Konverter.'
+                attribute class {'tx-converter-card__body'},
+                element span {
+                  attribute class {'tx-card-title-row'},
+                  element h3 {xs:string($c/@name)},
+                  ui:icon('chevron-right', 19)
+                },
+                element p {if (normalize-space($desc)) then $desc else ()},
+                element span {
+                  attribute class {'tx-inline-stats'},
+                  (element span {attribute class {'tx-dot tx-dot--info'}, xs:string($running) || ' ' || i18n:val('running-single',$context?lang)})[$running eq 1],
+                  (element span {attribute class {'tx-dot tx-dot--info'}, xs:string($running) || ' ' || i18n:val('running-multi',$context?lang)})[$running gt 1],
+                  element span {ui:icon('check', 14), xs:string($finished) || ' abgeschlossen'}
+                }
               }
             }
-          }
-    return ui:page($context,$content,$description)
+            else element div {
+              attribute class {'tx-converter-card'},
+              attribute title {i18n:val('requires-right',$lang)},
+              $card,
+              element span {
+                attribute class {'tx-converter-card__body'},
+                element span {
+                  attribute class {'tx-card-title-row'},
+                  element h3 {xs:string($c/@name)}
+                },
+                element p {if (normalize-space($desc)) then $desc else ()}
+              }
+            }
+        }[count($converters) gt 0],
+        element section {
+          attribute class {'tx-section'},
+          element div {
+            attribute class {'tx-section-heading'},
+            element h2 {i18n:val('worker',$lang)}
+          },
+          element div {
+            attribute class {'tx-worker-grid'},
+            for $w in $workers
+            let $status as element(*) := tr:get-worker-status($w),
+                $status-text as xs:string := xs:string($status/@status),
+                $wurl := '/worker/' || $w/@id,
+                $allowed := ui:can-do($username, $wurl),
+                $wconverters := tr:get-worker-converter($w)
+            return
+              element div {
+                attribute class {'tx-worker-card'},
+                element div {
+                  element strong {xs:string($w/@name)},
+                  element span {attribute class {'tx-mono'}, xs:string($w/@id)}
+                },
+                ui:status-badge($status-text, $lang, if ($status-text eq 'running') then 'Online' else 'Offline'),
+                for $wc in $wconverters
+                let $allowed := ui:can-do($username, $wurl || '/converter/' || $wc/@id),
+                    $runs as element(run)* := tr:get-runs($wc),
+                    $running := count($runs[status = ('running')]),
+                    $pending := count($runs[status = ('pending')]),
+                    $finished := count($runs[not(status = ('pending','running'))]),
+                    $desc := $wc/xs:string(@description),
+                    $card := element span {
+                      attribute class {'tx-converter-icon'},
+                      ui:icon('shield', 24)
+                    }
+                return
+                  if ($allowed)
+                  then element a {
+                    attribute class {'tx-converter-card'},
+                    attribute href {config:url('/' || $lang || $wurl ||  '/converter/' || $wc/@id)},
+                    element span {
+                      attribute class {'tx-converter-card__body'},
+                      element span {
+                        attribute class {'tx-card-title-row'},
+                        element h3 {xs:string($wc/@name)},
+                        ui:icon('chevron-right', 19)
+                      },
+                      element div {
+                        attribute class {'tx-inline-stats'},
+                        (element div {xs:string($running) || ' ' || i18n:val('running-single',$context?lang)})[$running eq 1],
+                        (element div {xs:string($running) || ' ' || i18n:val('running-multi',$context?lang)})[$running gt 1],
+                        (element div {xs:string($pending) || ' in der Warteschlange'})[$pending gt 0]
+                      }
+                    }
+                  }
+                  else element div {
+                    attribute class {'tx-converter-card'},
+                    attribute title {i18n:val('requires-right',$lang)},
+                    element span {
+                      attribute class {'tx-converter-card__body'},
+                      element span {
+                        attribute class {'tx-card-title-row'},
+                        element h3 {xs:string($wc/@name)}
+                      },
+                      element p {if (normalize-space($desc)) then $desc else ()}
+                    }
+                  }
+              }[count($wconverters) gt 0]
+            }
+        }[count($workers) gt 0])
+    return ui:page($context,$content)
 
   )
 };
@@ -108,16 +193,20 @@ function ui:converter-list($lang as xs:string){
       $context := map {'title': $title, 'lang': $lang, 'url':$url}
   return
     (
-      ui:check($right, $lang, $url),
-      let $content :=
+    ui:check($right, $lang, $url),
+    let $content :=
+          element div {
+            attribute class {'tx-panel'},
             element div {
-              attribute class {'well'},
-              for $converter in ($converters)
-              let $allowed := ui:check-only($converter/@worker || '-' || $converter/@id || ':convert')
-              return ui:create-anchor($context, $converter/xs:string(@name), string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/'), 'block', $allowed)
+              attribute class {'tx-panel__header'},
+              element h2 {i18n:val('converters',$lang)}
             },
+            for $converter in ($converters)
+            let $allowed := ui:check-only($converter/@worker || '-' || $converter/@id || ':convert')
+            return ui:create-anchor($context, $converter/xs:string(@name), string-join(('', $lang, 'converter', $converter/xs:string(@id)),'/'), 'tx-text-btn d-block', $allowed)
+          },
           $description := ''
-      return ui:page($context,$content,$description)
+    return ui:page($context,$content,$description)
     )
 };
 
@@ -128,78 +217,111 @@ declare
   %output:html-version('5')
 function ui:admin($lang as xs:string){
   let $right := 'admin:admin',
-      $title := 'Admin View',
+      $title := 'Admin',
       $url := '/admin',
       $username := ui:access-session('username'),
       $header := request:header-map(),
-      $memory as element(mem) := tr:system-memory(),
-      $cpu as element(cpu) := tr:system-cpu(),
-      $mem-bar-values := (
-        map {'name': 'Inactive', 'value':xs:integer($memory/entry[@key eq 'Inactive']/@value), 'background-color':'lightblue'},
-        map {'name': 'Active', 'value':xs:integer($memory/entry[@key eq 'Active']/@value), 'background-color':'lightblue'},
-        map {'name': 'Free', 'value':xs:integer($memory/entry[@key eq 'MemFree']/@value), 'background-color':'beige'}
-      ),
-      $cpu-bar-values := (
-        map {'name': 'Used', 'value':(100 - xs:decimal($cpu/cpuall/entry[@key eq '%idle']/@value)), 'background-color':'lightblue'},
-        map {'name': 'Idle', 'value':xs:decimal($cpu/cpuall/entry[@key eq '%idle']/@value), 'background-color':'beige'}
-      ),
+      $memory as element(mem)? := try { tr:system-memory() } catch * { () },
+      $cpu as element(cpu)? := try { tr:system-cpu() } catch * { () },
+      $metrics-available as xs:boolean := exists($memory) and exists($cpu),
+      $mem-values := (
+        map {'name': 'Aktiv', 'value': xs:integer($memory/entry[@key eq 'Active']/@value)},
+        map {'name': 'Inaktiv', 'value': xs:integer($memory/entry[@key eq 'Inactive']/@value)},
+        map {'name': 'Frei', 'value': xs:integer($memory/entry[@key eq 'MemFree']/@value)}
+      )[$metrics-available],
+      $mem-total := sum($mem-values ! .?value),
+      $mem-used := sum(($mem-values[?name ne 'Free']) ! .?value),
+      $cpu-used := (100 - xs:decimal($cpu/cpuall/entry[@key eq '%idle']/@value))[$metrics-available],
+      $cpu-values := (
+        map {'name': 'Belegt', 'value': $cpu-used},
+        map {'name': 'Leerlauf', 'value': xs:decimal($cpu/cpuall/entry[@key eq '%idle']/@value)}
+      )[$metrics-available],
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
   return (
     ui:check($right, $lang, $url),
     ui:page($context,
-    (element div {
-      attribute class {'well'},
-      ui:stacked-bars($mem-bar-values, true()),
-      element details {
-        element summary {'Memory Details'},
-        for $entry in $memory/entry
-        let $value := if (matches(xs:string($entry/@value),'^\d+$')) then prof:human(xs:integer($entry/@value) * 1024) else xs:string($entry/@value)
-        return 
-          element div {
-            attribute class {'d-flex start gap'},
-            element div {xs:string($entry/@key)},
-            element div {$value}
-          }
-        }
-      },
-    element div {
-      attribute class {'well'},
-      ui:stacked-bars($cpu-bar-values, false()),
-      element details {
-        element summary {'CPU Details'},
-        for $k in $cpu/*
-        return 
-          element div {
-            attribute class {'d-flex start gap'},
-            element div {
-              attribute style {'min-width:50px;'}, 
-              name($k)},
-            ui:stacked-bars(
-            (
-              for $entry in $k/entry[@key ne 'CPU'] where $entry/@key ne '%idle' return map {'name': $entry/@key, 'value':xs:decimal($entry/@value), 'background-color':'lightblue', 'color':'white'},
-              for $entry in $k/entry[@key ne 'CPU'] where $entry/@key eq '%idle' return map {'name': $entry/@key, 'value':xs:decimal($entry/@value), 'background-color':'beige', 'color':'white'}
-              
-              ),
-              false(),'small', false())
-          }
-        }
-      },
-    element div {
-      attribute class {'well'},
-      for $worker in $config:file//controller/worker
-      return
+      (
+        ui:page-intro($context, $title, 'Systemstatus und Worker-Auslastung'),
         element div {
-          attribute class {'well'},
-          element h3 {'Name: ' || $worker/xs:string(@name)},
+          attribute class {'tx-panel'},
+          element p {
+            attribute class {'tx-muted'},
+            'Systemmetriken (Arbeitsspeicher, CPU) sind nur auf Linux-Workern verfügbar.'
+          }
+        }[not($metrics-available)],
+        element div {
+          attribute class {'tx-metrics-grid'},
           element div {
-            element span {'id: ' || $worker/xs:string(@id)}
+            attribute class {'tx-panel tx-metric'},
+            element div {
+              attribute class {'tx-panel__header'},
+              element h2 {ui:icon('clock', 17), element span {'Arbeitsspeicher'}},
+              element strong {prof:human($mem-used * 1024) || ' / ' || prof:human($mem-total * 1024)}
+            },
+            ui:stacked-bars($mem-values, true()),
+            element div {
+              attribute class {'tx-legend'},
+              for $v at $i in $mem-values
+              return element span {element i {attribute class {'tx-segment--' || ($i - 1)}}, $v?name}
+            },
+            element details {
+              element summary {'Details'},
+              element dl {
+                attribute class {'tx-definition-list'},
+                for $entry in $memory/entry
+                let $value := if (matches(xs:string($entry/@value),'^\d+$')) then prof:human(xs:integer($entry/@value) * 1024) else xs:string($entry/@value)
+                return (element dt {xs:string($entry/@key)},
+                        element dd {$value})
+              }
+            }
           },
           element div {
-            element span {'internal url: ' || $worker/base-url/text()}
+            attribute class {'tx-panel tx-metric'},
+            element div {
+              attribute class {'tx-panel__header'},
+              element h2 {ui:icon('refresh', 17), element span {'CPU'}},
+              element strong {xs:string(round($cpu-used)) || ' % belegt'}
+            },
+            ui:stacked-bars($cpu-values, false()),
+            element div {
+              attribute class {'tx-legend'},
+              for $v at $i in $cpu-values
+              return element span {element i {attribute class {'tx-segment--' || ($i - 1)}}, $v?name}
+            },
+            element details {
+              element summary {'Details'},
+              element dl {
+                attribute class {'tx-definition-list'},
+                for $k in $cpu/cpuall/entry
+                return (element dt {xs:string($k/@key)},
+                        element dd {xs:string($k/@value)})
+              }
+            }
           }
-        }
-      }
-    )))
+        }[$metrics-available],
+        element div {
+          attribute class {'tx-panel'},
+          element div {
+            attribute class {'tx-panel__header'},
+            element h2 {i18n:val('workers',$lang)},
+            ui:status-badge('running', $lang, xs:string(count($config:file//controller/worker)) || ' konfiguriert')
+          },
+          element div {
+            attribute class {'tx-admin-workers'},
+            for $worker in $config:file//controller/worker
+            let $status as element(*) := tr:get-worker-status($worker),
+                $status-text as xs:string := xs:string($status/@status)
+            return
+              element div {
+                element strong {xs:string($worker/@name)},
+                element span {attribute class {'tx-mono'}, xs:string($worker/base-url)},
+                ui:status-badge($status-text, $lang, if ($status-text eq 'running') then i18n:val('online',$lang) else i18n:val('offline',$lang))
+              }
+          }
+        }[count($config:file//controller/worker) gt 0]
+      )
+    )
+  )
 };
 
 (: WORKER :)
@@ -216,30 +338,41 @@ function ui:worker-list($lang as xs:string){
       $workers as element(worker)* := tr:get-worker(),
       $url := '/worker',
       $username := ui:access-session('username'),
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $context := map {'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
   return
     (
       ui:check($right, $lang, $url),
       let $content :=
             element div {
-              attribute class {'well'},
-              element h3 {i18n:val('workers',$lang)},
-              for $worker in $workers
-              let $status as element(*) := tr:get-worker-status($worker),
-                  $status-text as xs:string := xs:string($status/@status),
-                  $worker-cpu := $status/cpu,
-                  $worker-memory := $status/memory,
-                  $url := '/worker/' || $worker/@id,
-                  $allowed := ui:can-do($username, $url)
-              return
+              attribute class {'tx-panel'},
               element div {
-                attribute class {''},
-                ui:create-anchor($context, xs:string($worker/@name),'/' || $lang || $url, (),$allowed),
-                element span {
-                  attribute class {if ($status-text eq 'running') then 'green' else 'red'},
-                  attribute title {i18n:val($status,$lang)},
-                  ' ⬤'}
+                attribute class {'tx-panel__header'},
+                element h2 {i18n:val('workers',$lang)}
+              },
+              element div {
+                attribute class {'tx-worker-grid'},
+                for $worker in $workers
+                let $status as element(*) := tr:get-worker-status($worker),
+                    $status-text as xs:string := xs:string($status/@status),
+                    $url := '/worker/' || $worker/@id,
+                    $allowed := ui:can-do($username, $url)
+                return
+                  element div {
+                    attribute class {'tx-worker-card'},
+                    element div {
+                      element strong {xs:string($worker/@name)},
+                      element span {attribute class {'tx-mono'}, xs:string($worker/@id)}
+                    },
+                    if ($allowed)
+                    then element a {
+                      attribute class {'tx-status tx-status--' || (if ($status-text eq 'running') then 'success' else 'neutral')},
+                      attribute href {config:url('/' || $lang || $url)},
+                      element span {attribute class {'tx-status__dot'}},
+                      if ($status-text eq 'running') then i18n:val('online',$lang) else i18n:val('offline',$lang)
+                    }
+                    else ui:status-badge($status-text, $lang, if ($status-text eq 'running') then i18n:val('online',$lang) else i18n:val('offline',$lang))
+                  }
               }
             },
           $description := ''
@@ -256,7 +389,7 @@ function ui:worker-page($worker-id as xs:string, $lang as xs:string){
   let $worker := tr:get-worker($worker-id),
       $converters := tr:get-worker-converter($worker),
       $url := string-join(('','worker', $worker-id),'/'),
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $title := i18n:val('worker',$lang) || ' ' || $worker-id,
       $username := ui:access-session('username'),
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
@@ -265,12 +398,16 @@ function ui:worker-page($worker-id as xs:string, $lang as xs:string){
     ui:page(
       $context,
       element div {
-          attribute class {'well'},
+          attribute class {'tx-panel'},
+          element div {
+            attribute class {'tx-panel__header'},
+            element h2 {xs:string($worker/@name)}
+          },
           for $converter in ($converters)
           let $url := '/worker/' || $converter/@worker || '/converter/' || $converter/@id,
               $allowed := ui:can-do($username, $url)
           return
-            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), '/' || $lang || $url, 'block', $allowed)
+            ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), '/' || $lang || $url, 'tx-text-btn d-block', $allowed)
         }
     )
   )
@@ -285,7 +422,7 @@ function ui:worker-converter-list($worker-id as xs:string, $lang as xs:string){
   let $worker as element(worker)? := tr:get-worker($worker-id),
       $converters as element(converter)* := tr:get-worker-converter($worker),
       $url := string-join(('','worker', $worker-id, 'converter'),'/'),
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $title := i18n:val('converter', $lang) || ' (' || i18n:val('on-worker',$lang) || ' ' || $worker/@name ||  ')',
       $username := ui:access-session('username'),
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url}
@@ -294,12 +431,12 @@ function ui:worker-converter-list($worker-id as xs:string, $lang as xs:string){
     ui:page(
       $context,
       element div {
-        attribute class {'well'},
+        attribute class {'tx-panel'},
         for $converter in ($converters)
         let $url := '/worker/' || $converter/@worker || '/converter/' || $converter/@id,
             $allowed := ui:can-do($username, $url)
         return
-          ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), '/' || $lang || $url, 'block', $allowed)
+          ui:create-anchor($context, $converter/xs:string(@name) || (' (' || $converter/@worker || ')'), '/' || $lang || $url, 'tx-text-btn d-block', $allowed)
       }
     )
   )
@@ -314,7 +451,7 @@ function ui:worker-converter-page($worker-id as xs:string, $converter-id as xs:s
   let $worker as element(worker)? := tr:get-worker($worker-id),
       $converter as element(converter)? := tr:get-worker-converter($worker, $converter-id),
       $url := string-join(('','worker', $worker-id, 'converter', $converter-id),'/'),
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $username := ui:access-session('username'),
       $title := $converter/xs:string(@name) || ' (' || i18n:val('on-worker',$lang) || ' '  || $worker/@name ||  ')',
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username': $username}
@@ -332,9 +469,9 @@ function ui:worker-converter-convert($worker-id as xs:string, $converter-id as x
       $text-params := map:remove(request:parameter-map(),'upload_file_uploaded_data'),
       $worker as element(worker)? := tr:get-worker($worker-id),
       $converter as element(converter)? := tr:get-worker-converter($worker,$converter-id),
-      $prev-runs as element(run)* := tr:get-runs($converter),
       $filename as xs:string := map:keys($file)[1],
-      $count as xs:integer := count($prev-runs[filename eq $filename]),
+      $prev-runs as element(run)* := tr:get-runs($converter)[filename/text() eq $filename],
+      $count as xs:integer := count($prev-runs),
       
       $log := hf:log('Convert file: ' || $filename || ' Delete: ' || xs:string($count),'CONVERT'),
       $max-prevs as xs:integer := (xs:integer($config:file/configurations/configuration/duplicate-files/@max),1)[1], 
@@ -359,7 +496,7 @@ declare
   %output:html-version('5')
 function ui:get-worker-converter-runs($worker-id as xs:string, $converter-id as xs:string, $lang as xs:string){
   let $url := '/worker/' || $worker-id || '/converter/' || $converter-id || '/runs',
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $check := ui:check($right,$lang,$url)
   return (
     $check,
@@ -454,7 +591,7 @@ declare
 function ui:converter-page($converter-id as xs:string, $lang as xs:string){
   let $converter as element(converter)? := conv:get($converter-id),
       $url := '/converter/' || $converter-id,
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $title := $converter/xs:string(@name),
       $username := ui:access-session('username'),
       $context := map {'right': $right, 'title': $title, 'lang': $lang, 'url':$url, 'username':$username}
@@ -474,7 +611,7 @@ function ui:get-converter-runs($converter-id as xs:string, $lang as xs:string){
       $title := i18n:val('conversions',$lang),
       $url := '/converter/' || $converter-id || '/runs',
       $return-url := '/converter/' || $converter-id,
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $context := map {'title': $title, 'lang': $lang, 'url':'/converter/'|| $converter-id || '/runs', 'right':$right, 'username': $username}
   return ui:build-runs-page($converter, $context)
 };
@@ -580,39 +717,63 @@ function ui:login-frontend($lang as xs:string, $return-url as xs:string?, $messa
   return
     ui:page(
       $context,
-      (
+      element div {
+        attribute class {'tx-auth-card'},
         element div {
-              attribute class {'well'},
-              element div {
-                attribute class {'red'},
-                $message
-              }
-            }[$message],
+          attribute class {'tx-logo'},
+          element span {'trans'},
+          element b {'pect'}
+        },
         element div {
-          attribute class {'well'},
-          element form {
-            attribute action {'do-login?url=' || $return-url},
-            attribute method {'POST'},
-            
-            hf:parameter-to-html(<input type="text" name-de="Username" name-en="Username" p-name="username" required=""/>,$lang),
-            hf:parameter-to-html(<input type="password" name-de="Passwort" name-en="Password" p-name="password" required=""/>,$lang),
+          attribute class {'tx-auth-heading'},
+          element h1 {i18n:val('login',$lang)},
+          element p {'Willkommen bei transpectUI'}
+        },
+        element div {
+          attribute class {'tx-alert tx-alert--danger'},
+          ui:icon('alert', 17),
+          element span {$message}
+        }[$message],
+        element form {
+          attribute action {'do-login?url=' || $return-url},
+          attribute method {'POST'},
+          element label {
+            i18n:val('username',$lang),
             element input {
-              attribute type {'hidden'},
-              attribute name {'url'},
-              attribute value {$return-url}
-            },
-            element form-group{
-              element label {},
-              element button {
-                  attribute id {'submit-login'},
-                  attribute class {'primary-btn'},
-                  attribute type {'submit'},
-                  i18n:val("login",$lang)
-              }
+              attribute type {'text'},
+              attribute name {'username'},
+              attribute autocomplete {'username'},
+              attribute required {''},
+              attribute autofocus {''}
             }
+          },
+          element label {
+            i18n:val('password',$lang),
+            element input {
+              attribute type {'password'},
+              attribute name {'password'},
+              attribute autocomplete {'current-password'},
+              attribute required {''}
+            }
+          },
+          element input {
+            attribute type {'hidden'},
+            attribute name {'url'},
+            attribute value {$return-url}
+          },
+          element button {
+            attribute class {'tx-btn tx-btn--primary tx-btn--full'},
+            attribute type {'submit'},
+            element span {i18n:val('login',$lang)},
+            ui:icon('arrow-right', 17)
           }
+        },
+        element p {
+          attribute class {'tx-auth-note'},
+          ui:icon('info', 15),
+          element span {'Zugang über die Geschäftsstelle'}
         }
-      )
+      }
     )
 };
 
@@ -651,20 +812,24 @@ declare
 function ui:error-frontend($lang as xs:string, $return-url as xs:string?, $message as xs:string?){
   let $title := 'TranspectUI Error',
       $url := '/error',
-      $context := map {'title': $title, 'lang': $lang, 'url':$url}
+      $context := map {'title': $title, 'lang': $lang, 'url':$url, 'center':true()}
   return
     ui:page(
       $context,
       element div {
-          attribute class {'well'},
-          element div {
-            attribute class {'red'},
-            $message
-          },
-          element div {
-            ui:create-anchor($context, i18n:val('back',$lang), $return-url)
-          }
+        attribute class {'tx-error-card'},
+        element div {
+          attribute class {'tx-error-icon'},
+          ui:icon('alert', 28)
+        },
+        element h1 {i18n:val('error',$lang)},
+        element p {element span {$message}},
+        element a {
+          attribute class {'tx-btn tx-btn--secondary'},
+          attribute href {config:url($return-url)},
+          i18n:val('back',$lang)
         }
+      }
     )
 };
 
@@ -745,7 +910,7 @@ function ui:user($lang, $username-to-update, $return-url){
         where sessions:get($id,'username') eq $username-to-update
         return $id,
       $url := '/users/' || $username-to-update,
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $owner := tr:endpoint-owner($url),
       $user-roles := u:roles-for-username($username-to-update),
       $user := u:users($username-to-update),
@@ -753,113 +918,108 @@ function ui:user($lang, $username-to-update, $return-url){
   return (
     ui:check($right, $lang, $url, $username-to-update),
     ui:page($context,(
+      ui:page-intro($context,
+        xs:string($username-to-update),
+        (i18n:val('last-online',$lang) || ': ' || hf:format-dateTime(xs:dateTime($user/xs:string(@last-online))))[$user/@last-online]),
       element div {
-        attribute class {'well'},
-        element h3 {i18n:val('sessions',$lang)},
-        (element span {attribute class {'date spacious'},i18n:val('last-online',$lang) || ': ' || hf:format-dateTime(xs:dateTime($user/xs:string(@last-online)))})[$user/@last-online],
-        for $id in $session-ids
-        return
-          element div {
-            attribute class {'well'},
-            element details {
-              element summary {$id},
-              for $name in sessions:names($id)
-              return
-                element div {
-                  element span {$name || ': ' || sessions:get($id, $name)}
-                },
-              ui:create-anchor($context, 'Session löschen','/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url])
-              }
-          }
-      },
-      element div {
-        attribute class {'well'},
-        element h3 {i18n:val('roles',$lang)},
+        attribute class {'tx-panel'},
+        element div {
+          attribute class {'tx-panel__header'},
+          element h2 {i18n:val('roles',$lang)}
+        },
         for $role in tr:roles()/role
         let $name := $role/xs:string(@name),
             $has-role := $user-roles = $name
         return
           element div {
-            if ($has-role)
-            then (
-              element span{ attribute class {'date'},'[' || i18n:val('add',$lang) || ']'},
-              ui:create-anchor($context, '[' || i18n:val('remove',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/remove?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url])
-            )
-            else
-              if (ui:check-only('u:mgmt'))
-              then (
-                ui:create-anchor($context, '[' || i18n:val('add',$lang) || ']', '/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/add?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url]),
-                element span{attribute class {'date'},'[' || i18n:val('remove',$lang) || ']'}
-              ),
-            element span {' - ' || $name},
-            element span {attribute class {'date'}, ' (rights: ' || string-join(for $right in $role/right return ($right/@name,$right/@matches),', ') || ')'},
-            if ($name eq 'admin') then ui:create-anchor($context, 'Admin View', '/' || $lang || '/admin', ('ml-10'), ui:can-do($context?username, '/' || $lang || '/admin')) else ()
+            attribute class {'tx-user-row'},
+            element div {
+              attribute class {'tx-user-cell'},
+              element span {attribute class {'tx-role-pill'}, $name},
+              element span {
+                attribute class {'tx-muted'},
+                ' (' || string-join(for $right in $role/right return ($right/@name,$right/@matches),', ') || ')'
+              }
+            },
+            element div {
+              attribute class {'tx-user-actions'},
+              if ($has-role)
+              then element a {
+                attribute class {'tx-link-btn tx-link-btn--danger'},
+                attribute href {config:url('/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/remove?url=' || $url || '&amp;return-url=' || $return-url)},
+                '[' || i18n:val('remove',$lang) || ']'
+              }
+              else if (ui:check-only('u:mgmt'))
+              then element a {
+                attribute class {'tx-link-btn'},
+                attribute href {config:url('/' || $lang || '/users/' || $username-to-update || '/roles/' || $name || '/add?url=' || $url || '&amp;return-url=' || $return-url)},
+                '[' || i18n:val('add',$lang) || ']'
+              }
+              else ()
+            }
           }
       },
       element div {
-        attribute class {'well'},
-        element h3 {i18n:val('password',$lang)},
-        
-        element form-group {
-          attribute class {'form-group'},
-          element form {
-            attribute method {'POST'},
-            attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url]},
-            attribute class {},
-            element form-group {
-              attribute class {'form-group'},
-              element label {
-                attribute for {'old-password'},
-                i18n:val('old-password',$lang)
+        attribute class {'tx-panel'},
+        element div {
+          attribute class {'tx-panel__header'},
+          element h2 {i18n:val('sessions',$lang)}
+        },
+        if (count($session-ids) eq 0)
+        then element p {attribute class {'tx-muted'}, i18n:val('no-sessions',$context?lang)}
+        else
+          for $id in $session-ids
+          return
+            element div {
+              attribute class {'tx-user-row'},
+              element div {
+                attribute class {'tx-user-cell'},
+                element span {attribute class {'tx-mono'}, $id}
               },
+              element div {
+                attribute class {'tx-user-actions'},
+                element a {
+                  attribute class {'tx-link-btn tx-link-btn--danger'},
+                  attribute href {config:url('/' || $lang || '/users/' || $username-to-update || '/sessions/' || $id || '/close?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url])},
+                  i18n:val('delete',$lang)
+                }
+              }
+            }
+      },
+      element div {
+        attribute class {'tx-panel'},
+        element h2 {i18n:val('password',$lang)},
+        element form {
+          attribute method {'POST'},
+          attribute action {'/' || $lang || '/users/' || $username-to-update || '/password/reset?url=' || $url || ('&amp;return-url=' || $return-url)[$return-url]},
+          element div {
+            attribute class {'tx-form-grid'},
+            element label {
+              i18n:val('old-password',$lang),
               element input {
-                attribute class {'form-control line'},
                 attribute type {'password'},
-                attribute name {'old-password'}
+                attribute name {'old-password'},
+                attribute required {''}
               }
             },
-            element form-group {
-              attribute class {'form-group'},
-              element label {
-                attribute for {'password'},
-                i18n:val('new-password',$lang)
-              },
+            element label {
+              i18n:val('new-password',$lang),
               element input {
-                attribute class {'form-control line'},
                 attribute type {'password'},
-                attribute name {'password'}
-              },
-              element form-group {
-                element input {
-                  attribute class {'form-control line'},
-                  attribute type {'submit'},
-                  attribute value {i18n:val('submit',$lang)}
-                }
+                attribute name {'new-password'},
+                attribute required {''}
+              }
+            },
+            element div {
+              element button {
+                attribute class {'tx-btn tx-btn--primary'},
+                attribute type {'submit'},
+                element span {i18n:val('submit',$lang)}
               }
             }
           }
         }
-      }(:,
-      element div {
-        attribute class {'well'},
-        element details {
-          element summary {'All Links'},
-          let $full := ui:build-full-map($username-to-update,$lang)
-          return
-            for $k in map:keys($full)
-            let $val := $full?$k 
-            return
-              if (exists($val))
-              then
-                element details {
-                  attribute class {'stacked'},
-                  element summary {$k},
-                  $val
-                }
-              else
-                element span {attribute class {'d-block stacked'}, $k}
-        }
-      }:)
+      }
     ),())
   )
 };
@@ -901,7 +1061,7 @@ declare
 function ui:user-management($lang){
   let $title := 'TranspectUI User Management',
       $url := '/users',
-      $right := tr:endpoint-right($url),
+      $right := tr:endpoint-right($url)[1],
       $username := ui:access-session('username'),
       $context := map {'title': $title, 'lang': $lang, 'url':$url,'username':$username},
       $online-users as xs:string* := (job:execute($ns:data || 'data:get-online-users()'),$username)
@@ -910,57 +1070,95 @@ function ui:user-management($lang){
     ui:page(
       $context,
       (
+        ui:page-intro($context,
+          i18n:val('user-preferences',$lang),
+          'Zugänge und Rollen für transpectUI verwalten.'),
         element div {
-          attribute class {'well'},
-          element h3 {i18n:val('user-preferences',$lang)},
+          attribute class {'tx-panel'},
           element div {
-            for $user in u:users()/user
-            return 
+            attribute class {'tx-panel__header'},
+            element h2 {ui:icon('user', 17), element span {'Benutzer'}},
+            element span {attribute class {'tx-panel__sub'}, xs:string(count(u:users()/user)) || ' Benutzer'}
+          },
+          element div {
+            attribute class {'tx-user-table__head'},
+            element span {i18n:val('username',$lang)},
+            element span {i18n:val('roles',$lang)},
+            element span {i18n:val('status',$lang)},
+            element span {i18n:val('actions',$lang)}
+          },
+          for $user in u:users()/user
+          return
+            element div {
+              attribute class {'tx-user-row'},
               element div {
-                attribute class {'d-flex'},
-                element div {ui:create-anchor($context, $user/username,'/' || $lang || '/users/' || $user/username),
-                if ($online-users = $user/username)
-                then element span {attribute class {'green'},' ⬤'}
-                else element span {attribute class {'red'},' ⬤'}},
-                ui:create-anchor($context, i18n:val('delete',$lang),'/' || $lang || '/users/' || $user/username || '/delete?url=' || $url) 
+                attribute class {'tx-user-cell'},
+                element span {
+                  attribute class {'tx-avatar tx-avatar--small'},
+                  upper-case(substring($user/username,1,1))
+                },
+                element a {
+                  attribute href {config:url('/' || $lang || '/users/' || $user/username)},
+                  xs:string($user/username)
+                }
+              },
+              element div {
+                for $role in u:roles-for-username(xs:string($user/username))
+                return element span {attribute class {'tx-role-pill'}, $role}
+              },
+              ui:status-badge(if ($online-users = $user/username) then 'running' else 'canceled', $lang,
+                              if ($online-users = $user/username) then i18n:val('online',$lang) else i18n:val('offline',$lang)),
+              element div {
+                attribute class {'tx-user-actions'},
+                element a {
+                  attribute class {'tx-icon-btn'},
+                  attribute href {config:url('/' || $lang || '/users/' || $user/username)},
+                  attribute aria-label {'Bearbeiten'},
+                  attribute title {'Bearbeiten'},
+                  ui:icon('settings', 16)
+                },
+                element a {
+                  attribute class {'tx-icon-btn tx-icon-btn--danger'},
+                  attribute href {config:url('/' || $lang || '/users/' || $user/username || '/delete?url=' || $url)},
+                  attribute aria-label {i18n:val('delete',$lang)},
+                  attribute title {i18n:val('delete',$lang)},
+                  ui:icon('trash', 16)
+                }
               }
-          }
+            }
         },
         element div {
-          attribute class {'well'},
-          element h3 {i18n:val('new-user',$lang)},
+          attribute class {'tx-panel tx-create-user'},
+          element h2 {i18n:val('new-user',$lang)},
           element form {
             attribute method {'POST'},
             attribute action {'/' || $lang || '/users/new?url=' || $url},
-            element form-group {
-              attribute class {'form-group'},
+            element div {
+              attribute class {'tx-form-grid'},
               element label {
-                attribute for {'username'},
-                i18n:val('username',$lang)
+                i18n:val('username',$lang),
+                element input {
+                  attribute type {'text'},
+                  attribute name {'username'},
+                  attribute required {''}
+                }
               },
-              element input {
-                attribute class {'form-control line '},
-                attribute type {'text'},
-                attribute name {'username'}
-              }
-            },
-            element form-group {
-              attribute class {'form-group'},
               element label {
-                attribute for {'password'},
-                i18n:val('password',$lang)
+                i18n:val('password',$lang),
+                element input {
+                  attribute type {'password'},
+                  attribute name {'password'},
+                  attribute required {''}
+                }
               },
-              element input {
-                attribute class {'form-control line'},
-                attribute type {'password'},
-                attribute name {'password'}
-              }
-            },
-            element form-group {
-              element input {
-                attribute class {'form-control line'},
-                attribute type {'submit'},
-                attribute value {i18n:val('submit',$lang)}
+              element div {
+                attribute class {'tx-create-actions'},
+                element button {
+                  attribute class {'tx-btn tx-btn--primary'},
+                  attribute type {'submit'},
+                  ui:icon('plus', 16),
+                  element span {i18n:val('submit',$lang)}
+                }
               }
             }
           }
@@ -1012,6 +1210,115 @@ declare %private function ui:close-session($id) {
   return sessions:close($id)
 };
 
+(: ---------- Design-Bausteine (Redesign v2, le-tex) ---------- :)
+
+declare %private function ui:icon($name as xs:string, $size as xs:integer := 18) {
+  element svg {
+    (attribute viewBox {'0 0 24 24'},
+     attribute fill {'none'},
+     attribute stroke {'currentColor'},
+     attribute stroke-width {'1.8'},
+     attribute stroke-linecap {'round'},
+     attribute stroke-linejoin {'round'},
+     attribute width {$size},
+     attribute height {$size},
+     attribute aria-hidden {'true'}),
+    (switch ($name)
+      case 'upload' return (element path {attribute d {'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'}},
+                            element polyline {attribute points {'17 8 12 3 7 8'}},
+                            element line {attribute x1 {'12'}, attribute y1 {'3'}, attribute x2 {'12'}, attribute y2 {'15'}})
+      case 'x' return (element line {attribute x1 {'18'}, attribute y1 {'6'}, attribute x2 {'6'}, attribute y2 {'18'}},
+                       element line {attribute x1 {'6'}, attribute y1 {'6'}, attribute x2 {'18'}, attribute y2 {'18'}})
+      case 'chevron-right' return element polyline {attribute points {'9 18 15 12 9 6'}}
+      case 'chevron-down' return element polyline {attribute points {'6 9 12 15 18 9'}}
+      case 'download' return (element path {attribute d {'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'}},
+                              element polyline {attribute points {'7 10 12 15 17 10'}},
+                              element line {attribute x1 {'12'}, attribute y1 {'15'}, attribute x2 {'12'}, attribute y2 {'3'}})
+      case 'file' return (element path {attribute d {'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'}},
+                          element polyline {attribute points {'14 2 14 8 20 8'}})
+      case 'refresh' return (element path {attribute d {'M21 12a9 9 0 1 1-2.64-6.36L21 8'}},
+                             element polyline {attribute points {'21 3 21 8 16 8'}})
+      case 'alert' return (element path {attribute d {'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'}},
+                           element line {attribute x1 {'12'}, attribute y1 {'9'}, attribute x2 {'12'}, attribute y2 {'13'}},
+                           element line {attribute x1 {'12'}, attribute y1 {'17'}, attribute x2 {'12'}, attribute y2 {'17.01'}})
+      case 'shield' return (element path {attribute d {'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'}},
+                            element polyline {attribute points {'9 12 11 14 15 10'}})
+      case 'user' return (element circle {attribute cx {'12'}, attribute cy {'8'}, attribute r {'4'}},
+                          element path {attribute d {'M4 21v-1a7 7 0 0 1 16 0v1'}})
+      case 'logout' return (element path {attribute d {'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'}},
+                            element polyline {attribute points {'16 17 21 12 16 7'}},
+                            element line {attribute x1 {'21'}, attribute y1 {'12'}, attribute x2 {'9'}, attribute y2 {'12'}})
+      case 'settings' return (element circle {attribute cx {'12'}, attribute cy {'12'}, attribute r {'3'}},
+                              element path {attribute d {'M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9 2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9 2.83-2.83'}})
+      case 'info' return (element circle {attribute cx {'12'}, attribute cy {'12'}, attribute r {'10'}},
+                          element line {attribute x1 {'12'}, attribute y1 {'16'}, attribute x2 {'12'}, attribute y2 {'12'}},
+                          element line {attribute x1 {'12'}, attribute y1 {'8'}, attribute x2 {'12.01'}, attribute y2 {'8'}})
+      case 'plus' return (element line {attribute x1 {'12'}, attribute y1 {'5'}, attribute x2 {'12'}, attribute y2 {'19'}},
+                          element line {attribute x1 {'5'}, attribute y1 {'12'}, attribute x2 {'19'}, attribute y2 {'12'}})
+      case 'check' return element polyline {attribute points {'20 6 9 17 4 12'}}
+      case 'trash' return (element polyline {attribute points {'3 6 5 6 21 6'}},
+                           element path {attribute d {'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'}})
+      case 'clock' return (element circle {attribute cx {'12'}, attribute cy {'12'}, attribute r {'10'}},
+                           element polyline {attribute points {'12 6 12 12 16 14'}})
+      case 'menu' return (element line {attribute x1 {'3'}, attribute y1 {'6'}, attribute x2 {'21'}, attribute y2 {'6'}},
+                          element line {attribute x1 {'3'}, attribute y1 {'12'}, attribute x2 {'21'}, attribute y2 {'12'}},
+                          element line {attribute x1 {'3'}, attribute y1 {'18'}, attribute x2 {'21'}, attribute y2 {'18'}})
+      case 'arrow-right' return (element line {attribute x1 {'5'}, attribute y1 {'12'}, attribute x2 {'19'}, attribute y2 {'12'}},
+                                 element polyline {attribute points {'12 5 19 12 12 19'}})
+      default return element circle {attribute cx {'12'}, attribute cy {'12'}, attribute r {'4'}})
+  }
+};
+
+declare function ui:status-badge($status as xs:string?, $lang as xs:string, $label as xs:string? := ()) {
+  let $tone := switch ($status)
+                case 'running' return 'info'
+                case 'pending' return 'warning'
+                case 'stopped' return 'success'
+                case 'canceled' return 'neutral'
+                case 'error' return 'danger'
+                default return 'neutral'
+  return element span {
+    attribute class {'tx-status tx-status--' || $tone},
+    element span {attribute class {'tx-status__dot'}},
+    ($label, i18n:val($status, $lang))[1]
+  }
+};
+
+declare %private function ui:page-intro($context as map(*), $title as xs:string, $description as xs:string?, $up-btn as xs:string? := ()) {
+  element div {
+    attribute class {'tx-page-intro'},
+    element div {
+      element h1 {$title},
+      element p {$description}[$description]
+    },
+    element a {
+      attribute class {'tx-btn tx-btn--secondary'},
+      attribute href {config:url('/' || $context?lang || string-join(tokenize($context?url,'/')[position() ne last()],'/'))},
+      element span {$up-btn}
+    }[exists($up-btn)]
+  }
+};
+
+declare %private function ui:breadcrumbs($context as map(*)) {
+  if ($context?hide-login or not($context?url) or $context?url eq '/' or $context?url eq '/login') then ()
+  else
+    let $parts := ($context?url => tokenize('/'))[normalize-space(.)]
+    return if (count($parts) le 1) then ()
+    else
+      element nav {
+        attribute class {'tx-breadcrumb'},
+        attribute aria-label {'Breadcrumb'},
+        element a {attribute href {config:url('/' || $context?lang)}, i18n:val('start',$context?lang)},
+        for $part at $i in $parts[position() ne last()]
+        let $href := string-join(('',$parts[position() le $i]),'/'),
+            $allowed := ui:can-do($context?username, $href)
+        return (ui:icon('chevron-right', 14),
+                ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)),
+        ui:icon('chevron-right', 14),
+        element strong {($context?title[normalize-space(.)], $parts[last()])[1]}
+      }
+};
+
 declare %private function ui:access-session($name) {
   session:get($name),
   session:set('accessed',current-dateTime())
@@ -1024,15 +1331,15 @@ declare %private function ui:access-session($name,$value) {
 
 declare function ui:empty-run-info($tag, $lang) {
   element div {
-    attribute class {'run-info line date'},
-    i18n:static-replacement($tag,$lang)
+    attribute class {'tx-run-row tx-run-row--empty'},
+    element span {i18n:static-replacement($tag,$lang)}
   }
 };
 
 declare function ui:build-runs-page($converter as element(converter), $context as map(xs:string, item()*)){
   ui:check($context?right, $context?lang, $context?return-url),
   let $runs as element(run)* := tr:get-runs($converter),
-      $allowed-runs := 
+      $allowed-runs :=
         for $run in $runs
         where tr:allowed($converter, $context?username,$run)
         return $run,
@@ -1051,16 +1358,26 @@ declare function ui:build-runs-page($converter as element(converter), $context a
       $context := map:merge(($context, map {'refresh': 5}))
   return
     ui:page(
-      $context, 
-      element div {
-          attribute class {'well'},
+      $context,
+      (
+        ui:page-intro($context,
+          i18n:val('conversions',$context?lang),
+          xs:string($converter/@name) || ' · ' || i18n:val('auto-refresh',$context?lang),
+          i18n:val('new-conversion',$context?lang)),
+        element div {
+          attribute class {'tx-runs-table'},
           element div {
-            attribute class {'date spacious'},
-            i18n:val('called',$context?lang) || ': ' || hf:format-dateTime(current-dateTime())
+            attribute class {'tx-table-head'},
+            element span {i18n:val('status',$context?lang)},
+            element span {'Datei / Run-ID'},
+            element span {i18n:val('username',$context?lang)},
+            element span {i18n:val('start',$context?lang)},
+            element span {i18n:val('actions',$context?lang)}
           },
           element div {
-            attribute class {'well'},
-            i18n:val('pending-conversions',$context?lang) || ':',
+            attribute class {'tx-group-label'},
+            i18n:val('pending-conversions',$context?lang),
+            element span {xs:string(count($pending-runs))},
             if (count($pending-runs) eq 0)
             then ui:empty-run-info('empty-pending',$context?lang)
             else
@@ -1069,8 +1386,9 @@ declare function ui:build-runs-page($converter as element(converter), $context a
               return ui:run-info-display($run, $converter, $context)
           },
           element div {
-            attribute class {'well'},
-            i18n:val('running-conversions',$context?lang) || ':',
+            attribute class {'tx-group-label'},
+            i18n:val('running-conversions',$context?lang),
+            element span {xs:string(count($running-runs))},
             if (count($running-runs) eq 0)
             then ui:empty-run-info('empty-running',$context?lang)
             else
@@ -1079,8 +1397,9 @@ declare function ui:build-runs-page($converter as element(converter), $context a
               return ui:run-info-display($run, $converter, map:put($context,'progress',true()))
           },
           element div {
-            attribute class {'well'},
-            i18n:val('finished-conversions',$context?lang) || ':',
+            attribute class {'tx-group-label'},
+            i18n:val('finished-conversions',$context?lang),
+            element span {xs:string(count($finished-runs))},
             if (count($finished-runs) eq 0)
             then ui:empty-run-info('empty-finished',$context?lang)
             else
@@ -1089,6 +1408,7 @@ declare function ui:build-runs-page($converter as element(converter), $context a
               return ui:run-info-display($run, $converter, $context)
           }
         }
+      )
     )
 };
 
@@ -1097,52 +1417,55 @@ declare function ui:run-info-display($run as element(run), $converter as element
       $filename:= $run/filename,
       $start as xs:dateTime := xs:dateTime($run/start),
       $status as xs:string? := $run/status/text(),
-      $running-text := i18n:val($status,$context?lang),
       $username as xs:string? := $run/username,
       $worker as element(worker)? := tr:get-worker($converter/@worker),
-      $is-worker as xs:boolean := exists($worker), 
-      
+      $is-worker as xs:boolean := exists($worker),
+
       $logs as element(line)* :=
         if ($context?progress)
         then tr:get-file-logs($run, $converter, $worker)
         else (),
       $progress as xs:decimal := if (exists($converter/progress/@max)) then count($logs) div xs:integer($converter/progress/@max) else 0,
-      $converter-url := 
+      $converter-url :=
         if ($is-worker)
         then '/' ||$context?lang || '/worker/' || $converter/@worker || '/converter/' || $converter/@id
-        else '/' ||$context?lang || '/converter/' || $converter/@id
-  return 
+        else '/' ||$context?lang || '/converter/' || $converter/@id,
+      $status-label := i18n:val($status,$context?lang) ||
+        (' · ' || format-number($progress,'0%'))[xs:boolean($context?progress) and exists($converter/progress/@max) and $progress gt 0]
+  return
     element div {
-      attribute class {'run-info line'},
+      attribute class {'tx-run-row'},
       element div {
-        attribute class {'run-info running'},
-        $running-text || (' (' || format-number($progress,'1%') || ')')[xs:boolean($context?progress) and exists($converter/progress/@max)],
-        hf:create-anchor(config:url($converter-url || '/runs/' || $runid), if ($status eq 'running') then i18n:static-replacement("logs",$context?lang) else i18n:static-replacement("results",$context?lang))
+        attribute class {'tx-run-status'},
+        ui:status-badge($status, $context?lang, $status-label),
+        element div {
+          attribute class {'tx-progress'},
+          element span {
+            attribute style {'width:' || xs:string(round($progress * 100)) || '%'}
+          }
+        }[xs:boolean($context?progress) and $progress gt 0]
       },
-      element div {
-        attribute class {'run-info runid'},
-        $runid
+      element a {
+        attribute class {'tx-run-file'},
+        attribute href {config:url($converter-url || '/runs/' || $runid)},
+        element span {attribute class {'tx-mono'}, $runid},
+        element strong {$filename}
       },
+      element span {attribute class {'tx-run-user'}, ($username, '–')[1]},
+      element span {attribute class {'tx-run-time'}, hf:format-dateTime($start)},
       element div {
-        attribute class {'run-info starttime'},
-        hf:format-dateTime($start)
-      },
-      element div {
-        attribute class {'run-info file'},
-        $filename
-      },
-      element div {
-        attribute class {'run-info username'},
-        $username
-      },
-      element div {
-        attribute class {'run-info username'},
-        xs:string($worker/@id)
-      }[$is-worker],
-      element div {
-        attribute class {'run-info cancel'},
-        hf:create-anchor(config:url($converter-url || '/runs/' || $runid || '/cancel' || '?url=/' || $context?lang || $context?url), i18n:static-replacement("cancel",$context?lang))
-      }[not($status = ('stopped','canceled'))]
+        attribute class {'tx-run-actions'},
+        element a {
+          attribute class {'tx-link-btn'},
+          attribute href {config:url($converter-url || '/runs/' || $runid)},
+          if ($status eq 'running') then i18n:static-replacement('logs',$context?lang) else i18n:static-replacement('results',$context?lang)
+        },
+        element a {
+          attribute class {'tx-link-btn tx-link-btn--danger'},
+          attribute href {config:url($converter-url || '/runs/' || $runid || '/cancel' || '?url=/' || $context?lang || $context?url)},
+          i18n:static-replacement('cancel',$context?lang)
+        }[not($status = ('stopped','canceled'))]
+      }
     }
 };
 
@@ -1152,109 +1475,177 @@ declare function ui:build-run-page($converter as element(converter), $run as ele
         $is-running as xs:boolean := $status eq 'running' or $status eq 'pending',
         $parameters as xs:string* := $run/params/line,
         $runid as xs:string := $run/runid,
-        $short-status := switch ($status)
-                          case 'running' return '▶️'
-                          case 'pending' return '⏳'
-                          case 'stopped' return '✔️'
-                          default return '-',
         $title as xs:string? := $run/filename,
         $is-allowed as xs:boolean := tr:allowed($converter, ui:access-session('username'),$run),
         $start as xs:dateTime := xs:dateTime($run/start),
         $end as xs:dateTime? := if (exists($run/end)) then xs:dateTime($run/end) else (),
-        $subtitle as xs:string? := hf:format-dateTime(xs:dateTime($run/start)) || (" - " || hf:format-dateTime($end) || ' (' || hf:format-duration($end - $start) || ')')[exists($end)],
-        $refresh := if ($is-running) then 5 else (),
-        $context := map:merge(($context, map {'status': $short-status || ' ', 'refresh': $refresh, 'subtitle':$subtitle})),
-        $log-dir := (($run/file => tokenize('/'))[position() ne last()] => string-join('/')) || '/debug/status',
+        $duration := if (exists($end)) then $end - $start else current-dateTime() - $start,
         $logs as element(line)* := tr:get-file-logs($run, $converter, $worker),
-        $job-results := tr:get-job-messages($run, $converter, $worker),
+        $job-results := tr:get-job-messages($run, $converter, $worker)/*,
         $job-errors := tr:get-job-errors($run, $converter, $worker),
-        (:$post-conv-actions := conv:get-post-conv-actions($converter),:)
-        $result-files as element(file)*:= tr:get-result-files($run, $converter, $worker)
-    return 
+        $result-files as element(file)*:= tr:get-result-files($run, $converter, $worker),
+        $is-worker as xs:boolean := exists($worker),
+        $run-url-suffix :=
+          if ($is-worker)
+          then '/worker/' || $converter/@worker || '/converter/' || $converter/@id || '/runs/' || $runid
+          else '/converter/' || $converter/@id || '/runs/' || $runid,
+        $refresh := if ($is-running) then 5 else (),
+        $context := map:merge(($context, map {'refresh': $refresh}))
+    return
       ui:page(
         $context,
-        element div {
+        (
+          element div {
+            attribute class {'tx-detail-head'},
             element div {
-              attribute class {'well'},
-              element h3 {i18n:val($status,$context?lang)},
-              hf:create-anchor(config:url($runid || '/cancel' || '?url=/' || $context?lang || $context?url), i18n:val("cancel",$context?lang))[not($run/status = ('stopped','canceled'))]
-            },
-            element details {
-              attribute class {'make-parameters well'},
-              element summary {'Parameters'},
-              element ul {
-                for $p in $parameters
-                return
-                  element li {
-                    $p
-                  }
+              ui:status-badge($status, $context?lang),
+              element h1 {$title},
+              element p {
+                element span {attribute class {'tx-mono'}, 'Run-ID ' || $runid},
+                element span {hf:format-dateTime($start)},
+                element span {hf:format-duration($duration)}
               }
             },
-            element details {
-              attribute class {'make-logs well'},
-              if ($status eq 'running') then attribute open {} else (),
-              element summary {i18n:val('logs',$context?lang) || ' (' || count($logs) ||')'},
-              for $log at $index in $logs
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {attribute class {'time'}, hf:format-dateTime($log/@time)},
-                element span {$log/text()}
+            element div {
+              attribute class {'tx-detail-head__actions'},
+              element a {
+                attribute class {'tx-btn tx-btn--danger-outline'},
+                attribute href {config:url($runid || '/cancel' || '?url=/' || $context?lang || $context?url)},
+                ui:icon('x', 16),
+                element span {i18n:val('cancel',$context?lang)}
+              }[not($run/status = ('stopped','canceled'))],
+              element a {
+                attribute class {'tx-btn tx-btn--secondary'},
+                attribute href {config:url('/' || $context?lang || string-join(tokenize($context?url,'/')[position() ne last()],'/'))},
+                element span {i18n:val('back-to-list',$context?lang)}
               }
-            },
-          element details {
-            attribute class {'well'},
-            if ($status eq 'stopped') then attribute open {} else (),
-            element summary {i18n:val('results',$context?lang)},
-            for $file in $result-files
-            let $extention := ($file/@name => tokenize('[\./]'))[last()],
-                $url := 
-                    if (exists($converter/@worker))
-                    then config:url('/' || $context?lang || '/worker/' || $converter/@worker || '/converter/' || $converter/@id || '/runs/' || $runid || '/download/' || $file/@name)
-                    else config:url('/' || $context?lang || '/converter/' || $converter/@id || '/runs/' || $runid || '/download/' || $file/@name)
-            return element div {
-              attribute class {'line d-flex'},
-              element div {
-                attribute class {'filename'},
-                element a {
-                  attribute href {$url},
-                  attribute target {'_blank'},
-                  attribute download {$file/@name},
-                  xs:string($file/@name)
-                }}(:,
-              element div {
-                attribute class {'actions'},
-                for $action in $post-conv-actions
-                where matches($file/@name, $action/xs:string(@regex))
-                return
-                  element input{
-                    attribute type {'button'},
-                    attribute value {$action/xs:string(@message)},
-                    attribute data-href {config:url(string-join(('/run',$runid, $file/@name, 'action', $action/xs:string(@target)),'/'))}
-                  }
-              }:)
             }
           },
-          element details {
-            attribute class {'well'},
-            element summary {i18n:val('run',$context?lang)},
-            element div {
-              attribute class {'overflow'},
-              for $m  at $index in $job-errors
-              return element div {
-                attribute class {'log-error'},
-                element span {attribute class {'index'}, $index},
-                element span {$m}
+          element div {
+            attribute class {'tx-accordions'},
+            element details {
+              attribute class {'tx-accordion'},
+              if ($status eq 'running') then attribute open {} else (),
+              element summary {
+                attribute class {'tx-accordion__trigger'},
+                element span {
+                  element span {ui:icon('clock', 18), element strong {i18n:val('logs',$context?lang) || ' (' || count($logs) || ')'}}
+                },
+                ui:icon('chevron-down', 18)
               },
-              for $m  at $index in $job-results
-              return element div {
-                attribute class {'log-entry'},
-                element span {attribute class {'index'}, $index},
-                element span {$m}
+              element div {
+                attribute class {'tx-accordion__content'},
+                element div {
+                  attribute class {'tx-log'},
+                  attribute aria-live {'polite'},
+                  if (count($logs) eq 0)
+                  then element div {element time {'–'}, element span {i18n:val('pending',$context?lang)}}
+                  else
+                    for $log at $index in $logs
+                    return element div {
+                      attribute class {'is-current'[$index eq count($logs)]},
+                      element time {hf:format-dateTime($log/@time)},
+                      element span {$log/text()}
+                    }
+                },
+                element div {
+                  attribute class {'tx-log-note'},
+                  element span {attribute class {'tx-pulse'}},
+                  element span {i18n:val('automatic-update',$context?lang)}
+                }[$is-running]
+              }
+            },
+            element details {
+              attribute class {'tx-accordion'},
+              element summary {
+                attribute class {'tx-accordion__trigger'},
+                element span {
+                  element span {ui:icon('settings', 18), element strong {i18n:val('parameters',$context?lang)}}
+                },
+                ui:icon('chevron-down', 18)
+              },
+              element div {
+                attribute class {'tx-accordion__content'},
+                element dl {
+                  attribute class {'tx-definition-list'},
+                  for $p in $parameters
+                  let $key := tokenize($p,'=')[1],
+                      $value := substring-after($p,'=')
+                  return (element dt {attribute class {'tx-mono'}, $key},
+                          element dd {$value})
+                }
+              }
+            },
+            element details {
+              attribute class {'tx-accordion'},
+              if ($status eq 'stopped') then attribute open {} else (),
+              element summary {
+                attribute class {'tx-accordion__trigger'},
+                element span {
+                  element span {ui:icon('download', 18), element strong {i18n:val('results',$context?lang) || ' (' || count($result-files) || ')'}}
+                },
+                ui:icon('chevron-down', 18)
+              },
+              element div {
+                attribute class {'tx-accordion__content'},
+                if (count($result-files) eq 0)
+                then element p {attribute class {'tx-muted'}, i18n:val('no-results',$context?lang)}
+                else
+                  element div {
+                    attribute class {'tx-result-list'},
+                    for $file at $index in $result-files
+                    let $name := xs:string($file/@name),
+                        $is-report := $index eq 1 and matches($name,'\.(x?html)$')
+                    return
+                      element div {
+                        attribute class {'tx-result-row' || ' is-featured'[$is-report]},
+                        ui:icon('file', 20),
+                        element div {
+                          element strong {$name}
+                        },
+                        element a {
+                          attribute class {'tx-btn tx-btn--secondary'},
+                          attribute href {config:url('/' || $context?lang || $run-url-suffix || '/show/' || $name)},
+                          attribute target {'_blank'},
+                          element span {i18n:val('show-report',$context?lang)}
+                        }[$is-report],
+                        element a {
+                          attribute class {'tx-icon-btn'},
+                          attribute href {config:url('/' || $context?lang || $run-url-suffix || '/download/' || $name)},
+                          attribute download {$name},
+                          attribute aria-label {i18n:val('download',$context?lang) || ': ' || $name},
+                          attribute title {i18n:val('download',$context?lang)},
+                          ui:icon('download', 17)
+                        }
+                      }
+                  }
+              }
+            },
+            element details {
+              attribute class {'tx-accordion'},
+              element summary {
+                attribute class {'tx-accordion__trigger'},
+                element span {
+                  element span {ui:icon('info', 18), element strong {i18n:val('job-messages',$context?lang) || ' (' || (count($job-errors) + count($job-results)) || ')'}}
+                },
+                ui:icon('chevron-down', 18)
+              },
+              element div {
+                attribute class {'tx-accordion__content'},
+                if (count($job-errors) + count($job-results) eq 0)
+                then element p {attribute class {'tx-muted'}, i18n:val('no-messages',$context?lang)}
+                else
+                  element ol {
+                    attribute class {'tx-message-list'},
+                    for $m in $job-errors
+                    return element li {attribute class {'is-error'}, $m},
+                    for $m in $job-results
+                    return element li {$m}
+                  }
               }
             }
           }
-          }
+        )
       )
   )
 };
@@ -1264,75 +1655,48 @@ declare function ui:build-converter-page($converter as element(converter), $cont
   ui:page(
     $context,
     (
-      element div {
-        attribute class {'well'},
-        attribute data-data {$context?username},
-        attribute data-right {tr:endpoint-right($context?url || '/runs')},
-        ui:create-anchor(
-          $context, 
-          i18n:val('prev-conversions',$context?lang),
-          '/' || $context?lang || $context?url || '/runs',(),
-          ui:can-do($context?username, $context?url || '/runs')
-        )
-      },
-      element div {
-        attribute class {'well'},
-        element h2 {i18n:val('new-conversion',$context?lang)},
-        element form {
-          attribute action {config:url('/' || $context?lang || $context?url || '/convert')},
-          attribute method {'POST'},
-          attribute enctype {"multipart/form-data"},
+      ui:page-intro($context,
+        $converter/xs:string(@name),
+        ($converter/xs:string(@description), i18n:val('upload',$context?lang))[1]),
+      element form {
+        attribute class {'tx-form-card'},
+        attribute action {config:url('/' || $context?lang || $context?url || '/convert')},
+        attribute method {'POST'},
+        attribute enctype {"multipart/form-data"},
+        element div {
+          attribute class {'tx-form-grid'},
           for $p in $converter/inputs/*
-          return hf:parameter-to-html($p, $context?lang),
-          element form-group{
-            element label {
-              i18n:val("upload",$context?lang)
-            },
-            element label {
-              attribute class {'file-drop'},
-              attribute id {'dropZone'},
-              element input {
-                attribute type {'file'},
-                attribute id {'fileInput'},
-                attribute name {'upload_file_uploaded_data'},
-                element div {
-                  attribute class {'file-content'},
-                  element p {
-                    attribute class {'file-title'},
-                    i18n:val('dragDrop',$context?lang)
-                  },
-                  element p {
-                    attribute class {'file-name'},
-                    attribute id {'fileName'},
-                    i18n:val('clickToChoose',$context?lang)
-                  }
-                }
-              }
-            },
-            (:element input {
-              attribute type {'text'},
-              attribute required {''},
-              attribute readonly {''},
-              attribute name {'file-name'},
-              attribute id {'file-name'},
-              attribute class {'form-control invalid'},
-              attribute onclick {"document.querySelector('#upload_file_uploaded_data').click();document.querySelector('#submit-to-conversion').classList.remove('disabled');"},
-              attribute placeholder {i18n:val("select-file",$context?lang)},
-              attribute autocomplete {'off'}
-            },
-            element input {
-              attribute type {'file'},
-              attribute id {'upload_file_uploaded_data'},
-              attribute name {'upload_file_uploaded_data'},
-              attribute class {'hidden'}
-            },:)
-            element button {
-              attribute id {'submit-to-conversion'},
-              attribute disabled {},
-              attribute class {'primary-btn disabled'},
-              attribute type {'submit'},
-              i18n:val("submit-file",$context?lang)
-            }
+          return hf:parameter-to-html($p, $context?lang)
+        },
+        element label {
+          attribute class {'tx-dropzone'},
+          attribute id {'dropZone'},
+          element input {
+            attribute type {'file'},
+            attribute id {'fileInput'},
+            attribute name {'upload_file_uploaded_data'},
+            attribute accept {xs:string($converter/input-file-ext/@allowed)}[exists($converter/input-file-ext/@allowed)]
+          },
+          element span {ui:icon('upload', 34)},
+          element strong {i18n:val('dragDrop',$context?lang)},
+          element span {i18n:val('clickToChoose',$context?lang)},
+          element small {$converter/input-file-ext/description[@lang eq $context?lang]}[$converter/input-file-ext/description[@lang eq $context?lang]]
+        },
+        element div {
+          attribute class {'tx-form-footer'},
+          ui:create-anchor(
+            $context,
+            i18n:val('prev-conversions',$context?lang),
+            '/' || $context?lang || $context?url || '/runs', 'tx-text-btn',
+            ui:can-do($context?username, $context?url || '/runs')
+          ),
+          element button {
+            attribute id {'submit-to-conversion'},
+            attribute disabled {},
+            attribute class {'tx-btn tx-btn--primary'},
+            attribute type {'submit'},
+            element span {i18n:val('submit-file',$context?lang)},
+            ui:icon('arrow-right', 17)
           }
         }
       }
@@ -1344,17 +1708,15 @@ declare %private function ui:page($context,$content,$description := ()){
   element html {
     ui:get-html-head($context),
     element body {
-      ui:get-html-header($context),
       element div {
-        attribute class {'d-flex'},
-        element div {
-          attribute class {'half'},
-          $content
-        },
-        element div {
-          attribute class {'half'},
+        attribute class {'tx-app'},
+        ui:get-html-header($context),
+        element main {
+          attribute class {'tx-main' || ' tx-main--center'[$context?hide-login or $context?center]},
+          ui:breadcrumbs($context),
+          $content,
           $description
-        }[exists($description)]
+        }
       }
     }
   }
@@ -1367,11 +1729,10 @@ declare %private function ui:get-html-head($context) {
       attribute content {$context?refresh}
     }[$context?refresh gt 0],
     element title {
-      $context?status || $context?title
+      string-join(($context?status,$context?title),' ') ! normalize-space(.)
     },
     element link {
       attribute rel {"stylesheet"},
-      attribute type {"text/css"},
       attribute href {config:url("/static/transpectui.css")}
     },
     element link{
@@ -1383,87 +1744,89 @@ declare %private function ui:get-html-head($context) {
       attribute src {config:url("/static/transpectui.js")}
     }
   }
-}; 
+};
 
 declare %private function ui:get-html-header($context as map(xs:string, item()?)) {
+  if ($context?hide-login) then () else
   element header {
-    attribute class {'d-flex column'},
+    attribute class {'tx-header'},
     element div {
-    attribute class {'d-flex'},
+      attribute class {'tx-header__inner'},
+      element button {
+        attribute class {'tx-mobile-menu'},
+        attribute aria-label {'Menü öffnen'},
+        ui:icon('menu', 20)
+      },
       element a {
+        attribute class {'tx-brand'},
         attribute href {config:url('/' || $context?lang)},
-        element img {
-          attribute class {"header"},
-          attribute src {config:url("/static/transpect.png")},
-          attribute title {i18n:val('start',$context?lang)}
+        attribute title {i18n:val('start',$context?lang)},
+        element span {
+          attribute class {'tx-logo'},
+          element span {'trans'},
+          element b {'pect'}
+        }
+      },
+      element nav {
+        attribute class {'tx-main-nav'},
+        attribute aria-label {'Hauptnavigation'},
+        element a {
+          attribute href {config:url('/' || $context?lang)},
+          attribute class {'is-active'[not($context?url) or $context?url eq '/' or $context?url eq '']},
+          i18n:val('start',$context?lang)
         }
       },
       element div {
-        attribute class {'d-flex column center'},
-        element h1 {attribute style {'margin-bottom: 0;'},$context?title},
-        if ($context?subtitle) then element span {attribute class {'date'}, $context?subtitle}
-      },
-      element div {
-        attribute class {'d-flex center gap'},
-          element ul {
-            for $language in $i18n:languages//language
-            return (
-              element a {
-                attribute href {config:url("/" || $language/xs:string(@short) || $context?url)},
-                element img {
-                  attribute class {'lang-img'},
-                  attribute src {config:url('/static/' || $language/xs:string(@short) ||'.png')}
-                }
-              }
-            )
-          },
-          if (session:get('username'))
-          then 
-            element div {
-              attribute class {'d-flex column'},
-              attribute style {'margin-top: -5px;'},
-              hf:create-anchor(config:url('/' || $context?lang || '/users/'|| session:get('username') || '?return-url=' || config:url($context?url)),session:get('username'),'lang-img right username'),
-              hf:create-anchor(config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('logout', $context?lang),'lang-img')
-            }
-          else if (not($context?hide-login)) then hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'lang-img')
-      }
-    },
-    element div {
-      attribute class {'d-flex start'},
-      element div {
-        attribute class {'nav'},
-        element span {'Navigation: '},
-        let $href := '',
-            $allowed := ui:can-do($context?username, $href),
-            $log := hf:log($context?username || '| ' || $href)
-        return element span {ui:create-anchor($context, i18n:val('start',$context?lang), '/' || $context?lang || $href,(),$allowed)},
-        if (exists($context?return-url))
-        then (
-          element span {', '},
-          element span {ui:create-anchor($context, i18n:val('back',$context?lang), '/' || $context?lang || $context?return-url,(),true())})
-      }[exists($context?username)],
-      let $bc := ($context?url => tokenize('/'))[normalize-space(.)]
-      return if ((count($bc) gt 1) and ($context?url ne '/login'))
-      then (
-        element span { attribute class {'desktop-only'}, '|'},
+        attribute class {'tx-header__tools'},
         element div {
-          attribute class {'breadcrumbs'},
-          let $parts := ($context?url => tokenize('/'))[position() ne last()]
-          return 
-            for $part at $i in $parts[normalize-space(.)](:[position() ne last()]:)
-            let $href := string-join($parts[position() le $i + 1],'/'),
-                $allowed := ui:can-do($context?username, $href),
-                $log := hf:log($context?username || '| ' || $href)
-            return element span {ui:create-anchor($context, $part, '/' || $context?lang || $href,(),$allowed)}
-        }
-        )
-      else ()
+          attribute class {'tx-languages'},
+          for $language in $i18n:languages//language
+          return element a {
+            attribute href {config:url('/' || $language/xs:string(@short) || $context?url)},
+            attribute class {'is-active'[$language/xs:string(@short) eq $context?lang]},
+            attribute title {$language/xs:string(@name)},
+            upper-case($language/xs:string(@short))
+          }
+        },
+        if (session:get('username'))
+        then
+          element div {
+            attribute class {'tx-user-menu'},
+            element button {
+              attribute class {'tx-user-trigger'},
+              attribute aria-haspopup {'true'},
+              attribute aria-expanded {'false'},
+              element span {attribute class {'tx-avatar'}, upper-case(substring(xs:string(session:get('username')),1,1))},
+              element span {attribute class {'tx-user-name'}, xs:string(session:get('username'))},
+              ui:icon('chevron-down', 15)
+            },
+            element div {
+              attribute class {'tx-popover'},
+              element a {
+                attribute href {config:url('/' || $context?lang || '/users/' || session:get('username') || '?return-url=' || config:url($context?url))},
+                ui:icon('user', 15),
+                i18n:val('user-preferences',$context?lang)
+              },
+              element a {
+                attribute href {config:url('/' || $context?lang || '/admin')},
+                ui:icon('settings', 15),
+                'Admin'
+              }[ui:can-do($context?username, '/' || $context?lang || '/admin')],
+              element a {
+                attribute href {config:url('/' || $context?lang || '/logout?url=' || config:url('/' || $context?lang || $context?url))},
+                ui:icon('logout', 15),
+                i18n:static-replacement('logout', $context?lang)
+              }
+            }
+          }
+        else hf:create-anchor(config:url('/' || $context?lang || '/login?url=' || config:url('/' || $context?lang || $context?url)),i18n:static-replacement('login', $context?lang),'tx-login-link')
+      }
     }
   }
-}; 
+};
 
 declare function ui:can-do($username,$url as xs:string) {
-  let $can := tr:can-do($username,tr:endpoint-right($url), tr:endpoint-owner($url)),
+  let $can := tr:can-do($username,tr:endpoint-right($url)[1], tr:endpoint-owner($url)),
       $log := hf:log('u: ' || $url || ' u: ' || $username || ' c: ' || xs:string($can),'CAN')
   return $can
 };
@@ -1613,23 +1976,20 @@ declare function ui:list-to-xml($current, $subs, $urls){
 
 declare function ui:stacked-bars($vals as map(*)*, $mem as xs:boolean, $class as xs:string? := (), $show-values as xs:boolean? := true()) {
   element div {
-    attribute class {'bar-diagram d-flex start ' || $class},
-    let $all as xs:integer := sum($vals ! .?value),
-        $length as xs:decimal := xs:decimal(max(($vals ! .?value)))
-    return (
-      for $v in $vals
-      let $name :=  $v?name,
-          $value := $v?value,
+    attribute class {'tx-stacked-bar ' || $class},
+    let $sum as xs:decimal := sum($vals ! xs:decimal(?value))
+    return
+      for $v at $i in $vals
+      let $value := xs:decimal($v?value),
           $display :=
-            if (exists($value))
-            then (if ($mem) then prof:human($value * 1024) else xs:integer(round($value)) || '%') ||' (' || $name || ')'
+            if (exists($value) and $sum gt 0)
+            then (if ($mem) then prof:human($value * 1024) else xs:string(round($value)) || '%') || ' (' || $v?name || ')'
             else 'EMPTY'
       return
-        element div {
-          attribute class {'bar-content'},
-          attribute style {'width:' || xs:string(($value div $length) * 100) || '%;' || (for $c in map:keys($v)[not(. = ('name','value'))] return $c || ': ' || $v?$c ||';')},
-          attribute title {$display},
-          $display[$show-values]
-        })
+        element span {
+          attribute class {'tx-segment tx-segment--' || (($i - 1) mod 3)},
+          attribute style {'width:' || xs:string(if ($sum gt 0) then ($value div $sum) * 100 else 0) || '%;'},
+          attribute title {$display}
+        }
   }
 };

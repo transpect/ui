@@ -2,6 +2,7 @@ module namespace worker = 'http://le-tex.de/worker';
 
 import module namespace hf = 'http://le-tex.de/helper-functions' at 'helper-functions.xqm';
 import module namespace config = 'http://le-tex.de/config' at 'config.xqm';
+import module namespace ns = 'http://le-tex.de/namespaces' at 'namespaces.xqm';
 
 declare variable $worker:worker := $config:file/configurations/configuration/controller/worker;
 declare variable $worker:is-controller := $config:file/configurations/configuration/controller/activated eq "true";
@@ -18,8 +19,27 @@ declare function worker:converter($worker as element(worker)? := (), $converter-
     return worker:get-converter($worker)[@id eq $converter-id or not(exists($converter-id))]
 };
 
-declare function worker:get-status($worker as element(worker)) {
-  let $status := worker:get($worker, string-join(('','api','en','status'),'/'))[2]/*
+declare function worker:get-worker-status($worker as element(worker)) {
+  let $status := worker:get($worker, string-join(('','api','en','status'),'/'))[2]/*,
+      $cache :=
+        if (exists(store:get($worker/@id || '-status')))
+        then hf:eval($ns:worker,'worker:update-worker-status-cache($worker)',{'worker': $worker},{'id': hf:id('update-worker-status-cache')})
+        else hf:execute($ns:worker,'worker:update-worker-status-cache($worker)',{'worker': $worker})
+  return store:get($worker/@id || '-status')
+};
+
+declare function worker:update-worker-status-cache($worker as element(worker)) {
+  let $result := worker:get($worker, string-join(('','api','en','status'),'/')),
+      $status :=
+        if (matches($result[2]/text(),'Connection failed'))
+        then element status {attribute status {'stopped'}}
+        else $result[2]/*,
+      $job-name := 'update-worker-status-cache' || '-' || $worker/@id,
+      $restart := 
+        if (count(job:list()[matches(.,$job-name)]) le 1)
+        then hf:eval($ns:worker, 'worker:update-worker-status-cache($worker)',{'worker': $worker},{'id': hf:id($job-name), 'start': 'PT0M20S'})
+        else (),
+      $store := store:put($worker/@id || '-status', $status) 
   return $status
 };
 
@@ -113,7 +133,7 @@ declare function worker:get-by-id($worker-id as xs:string?) as element(worker)? 
  : most basic request wrapper
  :)
 declare %private function worker:request($url, $header := (), $body as item()* := (), $method as xs:string := 'get', $override-media-type as xs:string? := ()) {
-  let $result := 
+  let $result := try {
         http:send-request(
           element http:request {
             attribute method {$method},
@@ -122,7 +142,11 @@ declare %private function worker:request($url, $header := (), $body as item()* :
           },
           $url,
           $body
-        ),
+        )}
+        catch * {
+          (element error {'An error occured'},
+           element error {'desc: ' || $err:description})
+        },
       $store := store:put('get',$result),
       $error-handled := if ($result instance of xs:string) then hf:log($result,'ERROR') else $result
   return $error-handled

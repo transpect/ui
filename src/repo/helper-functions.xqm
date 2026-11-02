@@ -20,6 +20,17 @@ declare function hf:eval($namespaces as xs:string*, $query as xs:string, $variab
   return $job-id
 };
 
+declare function hf:execute($namespaces as xs:string*, $query as xs:string, $variables as map(*)?) {
+  let $declaration :=
+        for $k in $variables ! map:keys(.)
+        where not(contains($query,'declare variable $' || $k ||' external;'))
+        return 'declare variable $' || $k ||' external;',
+      $call := string-join(($namespaces, $declaration, $query),'&#13;'),
+      $log := if ($hf:log-eval) then admin:write-log($call,'EVAL') else (),
+      $result := job:execute($call, $variables)
+  return $result
+};
+
 declare function hf:emit-updates($job-id, $emit-options) {
   let $update-types := distinct-values($emit-options ! .?update) (: 'update','add','delete' :)
   return
@@ -273,41 +284,47 @@ declare function hf:build-namespace-tree(
 
 declare function hf:parameter-to-html($input as element(*), $lang as xs:string){
   let $id := ($input/xs:string(@p-name),hf:id())[1],
-      $name := i18n:name($input, $lang)
+      $name := i18n:name($input, $lang),
+      $required := exists($input/@required),
+      $label := ($name, element span {attribute class {'tx-required'}, '*'}[$required])
   return
-    element form-group{
-      element label {$name || ':'},
-      switch (local-name($input))
-        case "input"
-        return 
+    switch (local-name($input))
+      case "input"
+      return
+        element label {
+          $label,
           $input update {
             delete node @name,
             insert node attribute placeholder {$name} into .,
             insert node attribute name {$id} into .,
-            insert node attribute id {$id} into .,
-            insert node attribute class {'form-control'} into .
+            insert node attribute id {$id} into .
           }
-        case "radiogroup"
-        return
-          for $radio at $index in $input/input[@type = 'radio']
-          let $sub-id := hf:id()
-          return
-            element div{
-              $radio update {
-                delete node @name,
-                insert node attribute name {$id} into .,
-                insert node attribute id {$sub-id} into .,
-                if ($index eq 1) then insert node attribute checked {} into .},
-              element label {
-                attribute {'for'} {$sub-id},
-                $radio/xs:string(@name)
+        }
+      case "radiogroup"
+      return
+        element fieldset {
+          element legend {$label},
+          element div {
+            attribute class {'tx-radio-pills'},
+            for $radio at $index in $input/input[@type = 'radio']
+            let $sub-id := hf:id()
+            return
+              element label{
+                $radio update {
+                  delete node @name,
+                  insert node attribute name {$id} into .,
+                  insert node attribute id {$sub-id} into .,
+                  if ($index eq 1) then insert node attribute checked {} into .},
+                element span {$radio/xs:string(@name)}
               }
-           }
-        case "select"
-        return
+          }
+        }
+      case "select"
+      return
+        element label {
+          $label,
           $input update {
-            insert node attribute id {$id} into .,
-            insert node attribute class {'form-control'} into .}
-        default return ()
-    }
+            insert node attribute id {$id} into .}
+        }
+      default return ()
 };

@@ -214,8 +214,8 @@ declare function make:get-targets($makefile as element(*)) as element(*)?{
   then
     $makefile update {
       for $line in tokenize(file:read-text($makefile/@location),'\n')
-      let $targets := tokenize($line,'\s') ! replace(.,':','')
-      where matches($line, "[a-zA-Z_]+:\s?$")
+      let $targets := tokenize($line,'\s') ! replace(.,':.*','')
+      where matches($line, "^[a-zA-Z_]+:.*$")
       return 
         for $t in $targets
         return insert node element target {$t} into .

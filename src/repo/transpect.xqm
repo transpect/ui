@@ -265,7 +265,7 @@ declare function tr:get-worker($worker-id as xs:string? := ()) as element(worker
 };
 
 declare function tr:get-worker-status($worker as element(worker)) as element(*) {
-  worker:get-status($worker)
+  worker:get-worker-status($worker)
 };
 
 declare function tr:get-worker-converter($worker as element(worker)? := (), $converter-id as xs:string? := ()) as element(converter)* {

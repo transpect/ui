@@ -40,12 +40,10 @@ BaseX based UI for transpect converters. Currently uses BaseX 13.
 ##### Launch
 - Lauch the environment `docker compose create && docker compose start` inside `/docker` directory. (`make start`)
 - Login via `http://localhost:8083/dba/login?_page=editor` with the above admin credentials. (These credentials are only for the BaseX access, not for TranspectUI)
-- Set Admin-PW: `import module namespace u = 'http://le-tex.de/user' at '/opt/basex/webapp/transpectui/user.xqm';
-u:set-password('admin',<admin-password>)`
+- Set Admin-PW: `import module namespace u = 'http://le-tex.de/user'; u:set-password('admin',<admin-password>)`
 - Login to TranspectUI `http://localhost:8083/en/login`
 - Create new users `http://localhost:8083/en/users`
-- Stop the environment `make stop`. It also removes all created containers.
+- Stop the environment `make stop`. It also removes all created containers. The conversion results are stored under /data/<worker>/
 
 ### Localization
 - String Replacements are tracked in `/src/transpectui/i18n.xqm`
-- Language flag images are placed under `/src/static/`. named like `en.png`
