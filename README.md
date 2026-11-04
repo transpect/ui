@@ -45,3 +45,6 @@ BaseX based UI for transpect converters. Currently uses BaseX 13.
 
 ### Localization
 - String Replacements are tracked in `/src/transpectui/i18n.xqm`
+
+### AI Disclamer
+Parts of this code is created by AI. Every Commit is reviewed by humans.
