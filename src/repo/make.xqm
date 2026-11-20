@@ -241,11 +241,16 @@ declare function make:get-file-logs($file) as element(line)*{
       $logs :=
         if (file:exists($log-dir))
         then
-          for $file in file:list($log-dir)
-          let $mod-by := file:last-modified($log-dir || '/' || $file)
-          order by $mod-by
-          where file:exists($log-dir || '/' ||$file)
-          return element line {attribute time {$mod-by}, file:read-text($log-dir || '/' ||$file)}
+          try {
+            for $file in file:list($log-dir)
+            let $mod-by := file:last-modified($log-dir || '/' || $file)
+            order by $mod-by
+            where file:exists($log-dir || '/' ||$file)
+            return element line {attribute time {$mod-by}, file:read-text($log-dir || '/' ||$file)}
+          }
+          catch * {
+            ()
+          }
         else ()
   return $logs
 };

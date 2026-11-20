@@ -108,10 +108,10 @@ function ui:default($lang) {
         }[count($converters) gt 0],
         element section {
           attribute class {'tx-section'},
-          element div {
+          (:element div {
             attribute class {'tx-section-heading'},
             element h2 {i18n:val('worker',$lang)}
-          },
+          },:)
           element div {
             attribute class {'tx-worker-grid'},
             for $w in $workers
@@ -121,13 +121,6 @@ function ui:default($lang) {
                 $allowed := ui:can-do($username, $wurl),
                 $wconverters := tr:get-worker-converter($w)
             return
-              element div {
-                attribute class {'tx-worker-card'},
-                element div {
-                  element strong {xs:string($w/@name)},
-                  element span {attribute class {'tx-mono'}, xs:string($w/@id)}
-                },
-                ui:status-badge($status-text, $lang, if ($status-text eq 'running') then 'Online' else 'Offline'),
                 for $wc in $wconverters
                 let $allowed := ui:can-do($username, $wurl || '/converter/' || $wc/@id),
                     $runs as element(run)* := tr:get-runs($wc),
@@ -149,6 +142,7 @@ function ui:default($lang) {
                       element span {
                         attribute class {'tx-card-title-row'},
                         element h3 {xs:string($wc/@name)},
+                          ui:status-badge($status-text, $lang, if ($status-text eq 'running') then 'Online' else 'Offline'),
                         ui:icon('chevron-right', 19)
                       },
                       element div {
@@ -158,20 +152,7 @@ function ui:default($lang) {
                         (element div {xs:string($pending) || ' in der Warteschlange'})[$pending gt 0]
                       }
                     }
-                  }
-                  else element div {
-                    attribute class {'tx-converter-card'},
-                    attribute title {i18n:val('requires-right',$lang)},
-                    element span {
-                      attribute class {'tx-converter-card__body'},
-                      element span {
-                        attribute class {'tx-card-title-row'},
-                        element h3 {xs:string($wc/@name)}
-                      },
-                      element p {if (normalize-space($desc)) then $desc else ()}
-                    }
-                  }
-              }[count($wconverters) gt 0]
+                  }[count($wconverters) gt 0]
             }
         }[count($workers) gt 0])
     return ui:page($context,$content)
@@ -1284,7 +1265,7 @@ declare function ui:status-badge($status as xs:string?, $lang as xs:string, $lab
   }
 };
 
-declare %private function ui:page-intro($context as map(*), $title as xs:string, $description as xs:string?, $up-btn as xs:string? := ()) {
+declare %private function ui:page-intro($context as map(*), $title as xs:string, $description as xs:string?, $up-btn as xs:string? := (), $upbtn-override as xs:string? := ()) {
   element div {
     attribute class {'tx-page-intro'},
     element div {
@@ -1293,7 +1274,7 @@ declare %private function ui:page-intro($context as map(*), $title as xs:string,
     },
     element a {
       attribute class {'tx-btn tx-btn--secondary'},
-      attribute href {config:url('/' || $context?lang || string-join(tokenize($context?url,'/')[position() ne last()],'/'))},
+      attribute href {if ($upbtn-override) then $upbtn-override else config:url('/' || $context?lang || string-join(tokenize($context?url,'/')[position() ne last()],'/'))},
       element span {$up-btn}
     }[exists($up-btn)]
   }
@@ -1657,7 +1638,9 @@ declare function ui:build-converter-page($converter as element(converter), $cont
     (
       ui:page-intro($context,
         $converter/xs:string(@name),
-        ($converter/xs:string(@description), i18n:val('upload',$context?lang))[1]),
+        ($converter/xs:string(@description), i18n:val('upload',$context?lang))[1],
+        i18n:val('prev-conversions',$context?lang),
+        config:url('/' || $context?lang || $context?url || '/runs')),
       element form {
         attribute class {'tx-form-card'},
         attribute action {config:url('/' || $context?lang || $context?url || '/convert')},
@@ -1684,12 +1667,13 @@ declare function ui:build-converter-page($converter as element(converter), $cont
         },
         element div {
           attribute class {'tx-form-footer'},
-          ui:create-anchor(
+          (:ui:create-anchor(
             $context,
             i18n:val('prev-conversions',$context?lang),
             '/' || $context?lang || $context?url || '/runs', 'tx-text-btn',
             ui:can-do($context?username, $context?url || '/runs')
-          ),
+          ),:)
+          element span {},
           element button {
             attribute id {'submit-to-conversion'},
             attribute disabled {},

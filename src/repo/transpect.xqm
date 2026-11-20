@@ -181,7 +181,7 @@ declare function tr:allowed($converter as element(converter), $caller as xs:stri
             $group-matches := $my-groups[. = $run-groups]
         return count($group-matches) gt 0,
      $owner := $username eq $caller,
-     $can-do := tr:can-do($caller,($worker || '-')[$worker] || $converter-id || ':runs') 
+     $can-do := tr:can-do($caller,($worker || '-')[$worker] || $converter-id || ':conversions') 
   return ($same-group or $owner or  $can-do)
 };
 
